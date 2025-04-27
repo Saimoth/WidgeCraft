@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>7×7 Ring-Buffer 5-in-a-Row (2-Player)</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: #fafafa; font-family: Arial, sans-serif;
+    }
+    #game {
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      height: 100%; padding: 1rem; box-sizing: border-box;
+    }
+    #message {
+      margin-bottom: 1rem;
+      display: flex; align-items: center; gap: .5rem;
+    }
+    .turn-indicator {
+      width: 3rem; height: 3rem;
+      border: 2px solid #333; border-radius: 50%;
+      box-sizing: border-box;
+    }
+    .turn-indicator.red  { background: #dc3545; }
+    .turn-indicator.blue { background: #007bff; }
+    button {
+      margin-top: 1rem; padding: .5rem 1rem;
+      font-size: 1rem; border: none;
+      background: #333; color: #fff;
+      border-radius: 4px; cursor: pointer;
+      box-shadow: 0 2px 6px rgba(0,0,0,.2);
+    }
+    /* Responsive square board */
+    #board-container {
+      position: relative;
+      width: 90vw; max-width: 700px;
+      aspect-ratio: 1 / 1;
+      background: #fff; border: 4px solid #333;
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0,0,0,.1);
+      overflow: hidden;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      grid-template-rows:    repeat(7, 1fr);
+      width: 100%; height: 100%;
+    }
+    .cell {
+      box-sizing: border-box;
+      border: 1px solid #ddd;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer;
+    }
+    .mark {
+      width: 60%; height: 60%;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: bold; font-size: 1rem; line-height: 1;
+      transition: opacity .3s;
+    }
+    .mark.red  { background: #dc3545; }
+    .mark.blue { background: #007bff; }
+    .mark.expiring { opacity: 0.3; }
+
+    .win-line {
+      position: absolute; height: 4px;
+      background: #000; transform-origin: 0 50%;
+      pointer-events: none;
+    }
+    .particle {
+      position: absolute; width: 8px; height: 8px;
+      border-radius: 50%; pointer-events: none;
+      animation: explode 1s ease-out forwards;
+    }
+    @keyframes explode {
+      from { transform: translate(0,0) scale(1); opacity: 1 }
+      to   { transform: translate(var(--dx),var(--dy)) scale(.3); opacity: 0 }
+    }
+  </style>
+</head>
+<body>
+  <div id="game">
+    <div id="message">
+      <div id="turn-indicator" class="turn-indicator red"></div>
+      <span id="message-text"></span>
+    </div>
+    <div id="board-container">
+      <div id="board"></div>
+    </div>
+    <button id="reset">Play Again</button>
+  </div>
+  <script>
+  (function(){
+    const ROWS = 7, COLS = 7, WIN = 5, CAP = 9;
+    const boardCont  = document.getElementById('board-container'),
+          boardEl    = document.getElementById('board'),
+          indicator  = document.getElementById('turn-indicator'),
+          msgText    = document.getElementById('message-text'),
+          resetBtn   = document.getElementById('reset');
+
+    // Build the 7×7 grid
+    const cells = [];
+    for(let i = 0; i < ROWS * COLS; i++){
+      const c = document.createElement('div');
+      c.className = 'cell';
+      c.dataset.index = i;
+      boardEl.appendChild(c);
+      cells.push(c);
+    }
+
+    // Game state
+    let state = Array(ROWS * COLS).fill(''),
+        moves = { red: [], blue: [] },
+        turn = 'red',
+        active = true,
+        fwInt;
+
+    function updateIndicator(){
+      indicator.className = 'turn-indicator ' + turn;
+      msgText.textContent = '';
+    }
+    function showWin(color){
+      indicator.className = 'turn-indicator ' + color;
+      msgText.textContent = color.charAt(0).toUpperCase() + color.slice(1) + ' wins!';
+    }
+
+    function place(idx, color){
+      state[idx] = color;
+      const mkc = cells[idx];
+      mkc.innerHTML = '';
+      const mk = document.createElement('div');
+      mk.className = 'mark ' + color;
+      mkc.appendChild(mk);
+    }
+
+    function removeCell(idx){
+      state[idx] = '';
+      cells[idx].innerHTML = '';
+    }
+
+    function updateCountdowns(){
+      ['red','blue'].forEach(color => {
+        const list = moves[color], len = list.length;
+        list.forEach((pos, i) => {
+          const mk = cells[pos].querySelector('.mark');
+          if(!mk) return;
+          const age = len - 1 - i;
+          const rem = CAP - age;
+          mk.textContent = rem;
+          mk.classList.toggle('expiring', rem === 1);
+        });
+      });
+    }
+
+    function inbound(r, c){
+      return r >= 0 && r < ROWS && c >= 0 && c < COLS;
+    }
+
+    function findWin(color){
+      const dirs = [[1,0],[0,1],[1,1],[1,-1]];
+      for(let r = 0; r < ROWS; r++){
+        for(let c = 0; c < COLS; c++){
+          if(state[r*COLS+c] !== color) continue;
+          for(const [dr,dc] of dirs){
+            const pr = r - dr, pc = c - dc;
+            if(inbound(pr,pc) && state[pr*COLS+pc] === color) continue;
+            const line = [r*COLS+c];
+            for(let k = 1; k < WIN; k++){
+              const rr = r + dr*k, cc = c + dc*k;
+              if(inbound(rr,cc) && state[rr*COLS+cc] === color){
+                line.push(rr*COLS+cc);
+              } else break;
+            }
+            if(line.length >= WIN) return line;
+          }
+        }
+      }
+      return null;
+    }
+
+    function drawLine(line){
+      const start = line[0], end = line[line.length-1];
+      const sr = Math.floor(start / COLS), sc = start % COLS;
+      const er = Math.floor(end   / COLS), ec = end   % COLS;
+      const rect = boardEl.getBoundingClientRect();
+      const cellW = rect.width  / COLS,
+            cellH = rect.height / ROWS;
+      const x1 = cellW * (sc + .5), y1 = cellH * (sr + .5);
+      const x2 = cellW * (ec + .5), y2 = cellH * (er + .5);
+      const dx = x2 - x1, dy = y2 - y1;
+      const len = Math.hypot(dx,dy),
+            ang = Math.atan2(dy,dx) * 180/Math.PI;
+      const ln = document.createElement('div');
+      ln.className = 'win-line';
+      ln.style.width     = len + 'px';
+      ln.style.left      = x1  + 'px';
+      ln.style.top       = y1  + 'px';
+      ln.style.transform = 'rotate(' + ang + 'deg)';
+      boardCont.appendChild(ln);
+    }
+
+    function spawn(){
+      const rect = boardCont.getBoundingClientRect();
+      for(let b = 0; b < 3; b++){
+        const ox = Math.random() * rect.width,
+              oy = Math.random() * rect.height;
+        for(let k = 0; k < 50; k++){
+          (()=>{
+            const p = document.createElement('div');
+            p.className = 'particle';
+            const a = Math.random() * 2*Math.PI,
+                  s = Math.random() * 100 + 40;
+            p.style.setProperty('--dx', Math.cos(a)*s + 'px');
+            p.style.setProperty('--dy', Math.sin(a)*s + 'px');
+            p.style.left   = ox + 'px';
+            p.style.top    = oy + 'px';
+            p.style.background = 'hsl(' + (Math.random()*360) + ',70%,60%)';
+            boardCont.appendChild(p);
+            setTimeout(()=>p.remove(), 1000);
+          })();
+        }
+      }
+    }
+
+    function win(color, line){
+      active = false;
+      showWin(color);
+      drawLine(line);
+      fwInt = setInterval(spawn, 400);
+    }
+
+    function clickCell(e){
+      if(!active) return;
+      const i = +e.currentTarget.dataset.index;
+      if(state[i]) return;
+      // ring-buffer removal
+      if(moves[turn].length === CAP){
+        removeCell(moves[turn].shift());
+      }
+      place(i, turn);
+      moves[turn].push(i);
+      updateCountdowns();
+      const line = findWin(turn);
+      if(line){ win(turn, line); return; }
+      // next player
+      turn = (turn === 'red' ? 'blue' : 'red');
+      updateIndicator();
+    }
+
+    cells.forEach(c => c.addEventListener('click', clickCell));
+    resetBtn.addEventListener('click', () => {
+      cells.forEach(c => c.innerHTML = '');
+      state.fill(''); moves = { red: [], blue: [] };
+      turn = 'red'; active = true;
+      document.querySelectorAll('.win-line').forEach(l => l.remove());
+      document.querySelectorAll('.particle').forEach(p => p.remove());
+      clearInterval(fwInt);
+      updateIndicator();
+    });
+
+    // Initial
+    updateIndicator();
+  })();
+  </script>
+</body>
+</html>
