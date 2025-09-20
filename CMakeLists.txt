@@ -11,6 +11,7 @@ set(GLFW_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_TESTS    OFF CACHE BOOL "" FORCE)
 set(GLFW_BUILD_DOCS     OFF CACHE BOOL "" FORCE)
 set(GLFW_INSTALL        OFF CACHE BOOL "" FORCE)
+set(GLFW_BUILD_WAYLAND  OFF CACHE BOOL "" FORCE)
 
 FetchContent_Declare(
   glfw
@@ -31,10 +32,13 @@ FetchContent_MakeAvailable(glad)
 add_executable(widgecraft
     src/main.cpp
     src/Window.cpp
+    src/TextRenderer.cpp
 )
 
 target_include_directories(widgecraft
-    PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include
+    PRIVATE
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+        ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
 target_link_libraries(widgecraft PRIVATE glfw glad)
