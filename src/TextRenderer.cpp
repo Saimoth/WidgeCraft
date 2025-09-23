@@ -51,7 +51,8 @@ namespace WidgeCraft {
 
             void main() {
                 float distance = texture(uTexture, vTexCoord).r;
-                float coverageWidth = max(uSmoothing, fwidth(distance));
+                vec2 gradient = vec2(dFdx(distance), dFdy(distance));
+                float coverageWidth = max(uSmoothing, 0.5 * length(gradient));
                 float alpha = smoothstep(uEdgeValue - coverageWidth, uEdgeValue + coverageWidth, distance);
                 FragColor = vec4(uTextColor, alpha);
             }
