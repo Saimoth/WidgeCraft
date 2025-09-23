@@ -412,9 +412,9 @@ namespace WidgeCraft {
             glyph.width = static_cast<float>(width);
             glyph.height = static_cast<float>(height);
             glyph.u0 = width > 0 ? static_cast<float>(penX) / static_cast<float>(m_atlasWidth) : 0.0f;
-            glyph.v0 = height > 0 ? static_cast<float>(penY) / static_cast<float>(m_atlasHeight) : 0.0f;
+            glyph.v0 = height > 0 ? static_cast<float>(penY + height) / static_cast<float>(m_atlasHeight) : 0.0f;
             glyph.u1 = width > 0 ? static_cast<float>(penX + width) / static_cast<float>(m_atlasWidth) : 0.0f;
-            glyph.v1 = height > 0 ? static_cast<float>(penY + height) / static_cast<float>(m_atlasHeight) : 0.0f;
+            glyph.v1 = height > 0 ? static_cast<float>(penY) / static_cast<float>(m_atlasHeight) : 0.0f;
             glyph.glyphIndex = glyphIndex;
 
             m_glyphs.emplace(static_cast<char>(codepoint), glyph);
