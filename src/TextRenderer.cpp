@@ -250,7 +250,8 @@ namespace WidgeCraft {
             }
 
             float xPos = cursorX + glyph->xOffset * scale;
-            float yPos = cursorY + glyph->yOffset * scale;
+            // yOffset is downwards-positive in stb_truetype, so convert to OpenGL's y-up space.
+            float yPos = cursorY - (glyph->yOffset + glyph->height) * scale;
             float w = glyph->width * scale;
             float h = glyph->height * scale;
 
