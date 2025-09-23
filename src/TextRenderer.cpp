@@ -152,6 +152,7 @@ namespace WidgeCraft {
         m_atlasData.clear();
         m_fontBuffer.clear();
         m_fallbackGlyph = nullptr;
+        m_basePixelHeight = 0.0f;
     }
 
     void TextRenderer::moveFrom(TextRenderer&& other) noexcept {
@@ -169,6 +170,7 @@ namespace WidgeCraft {
         m_ascent = other.m_ascent;
         m_descent = other.m_descent;
         m_lineHeight = other.m_lineHeight;
+        m_basePixelHeight = other.m_basePixelHeight;
         m_screenWidth = other.m_screenWidth;
         m_screenHeight = other.m_screenHeight;
         m_edgeValue = other.m_edgeValue;
@@ -190,6 +192,7 @@ namespace WidgeCraft {
         other.m_ascent = 0.0f;
         other.m_descent = 0.0f;
         other.m_lineHeight = 0.0f;
+        other.m_basePixelHeight = 0.0f;
         other.m_screenWidth = 0;
         other.m_screenHeight = 0;
         other.m_edgeValue = 0.0f;
@@ -208,10 +211,20 @@ namespace WidgeCraft {
         updateProjection();
     }
 
-    void TextRenderer::renderText(const std::string& text, float x, float y, float scale, Color color) {
-        if (text.empty() || scale <= 0.0f || m_shader == 0 || m_texture == 0) {
+    void TextRenderer::renderText(const std::string& text, float x, float y, float sizePixels, Color color) {
+        if (text.empty() || m_shader == 0 || m_texture == 0) {
             return;
         }
+
+        if (sizePixels <= 0.0f) {
+            sizePixels = m_basePixelHeight;
+        }
+
+        if (sizePixels <= 0.0f || m_basePixelHeight <= 0.0f) {
+            return;
+        }
+
+        const float sizeScale = sizePixels / m_basePixelHeight;
 
         std::vector<float> vertices;
         vertices.reserve(text.size() * 6 * 4);
@@ -222,7 +235,7 @@ namespace WidgeCraft {
         glUseProgram(m_shader);
         glUniformMatrix4fv(m_uniformProjection, 1, GL_FALSE, m_projection.data());
         glUniform3f(m_uniformTextColor, color.r, color.g, color.b);
-        glUniform1f(m_uniformSmoothing, m_smoothing / scale);
+        glUniform1f(m_uniformSmoothing, m_smoothing / sizeScale);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_texture);
@@ -234,7 +247,7 @@ namespace WidgeCraft {
             const char c = text[i];
             if (c == '\n') {
                 cursorX = x;
-                cursorY -= m_lineHeight * scale;
+                cursorY -= m_lineHeight * sizeScale;
                 continue;
             }
 
@@ -249,11 +262,11 @@ namespace WidgeCraft {
                 continue;
             }
 
-            float xPos = cursorX + glyph->xOffset * scale;
+            float xPos = cursorX + glyph->xOffset * sizeScale;
             // yOffset is downwards-positive in stb_truetype, so convert to OpenGL's y-up space.
-            float yPos = cursorY - (glyph->yOffset + glyph->height) * scale;
-            float w = glyph->width * scale;
-            float h = glyph->height * scale;
+            float yPos = cursorY - (glyph->yOffset + glyph->height) * sizeScale;
+            float w = glyph->width * sizeScale;
+            float h = glyph->height * sizeScale;
 
             if (w > 0.0f && h > 0.0f) {
                 vertices.insert(vertices.end(), {
@@ -267,7 +280,7 @@ namespace WidgeCraft {
                 });
             }
 
-            cursorX += glyph->advance * scale;
+            cursorX += glyph->advance * sizeScale;
 
             if (i + 1 < text.size() && m_fontInfo) {
                 const char nextChar = text[i + 1];
@@ -280,7 +293,7 @@ namespace WidgeCraft {
                     }
                     if (glyph->glyphIndex >= 0 && nextGlyphIndex >= 0) {
                         int kern = stbtt_GetGlyphKernAdvance(m_fontInfo.get(), glyph->glyphIndex, nextGlyphIndex);
-                        cursorX += static_cast<float>(kern) * m_scale * scale;
+                        cursorX += static_cast<float>(kern) * m_scale * sizeScale;
                     }
                 }
             }
@@ -344,6 +357,7 @@ namespace WidgeCraft {
         m_ascent = ascent * m_scale;
         m_descent = descent * m_scale;
         m_lineHeight = (ascent - descent + lineGap) * m_scale;
+        m_basePixelHeight = m_ascent - m_descent;
 
         int penX = kPadding;
         int penY = kPadding;

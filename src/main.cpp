@@ -26,12 +26,13 @@ int main(int argc, char* argv[]) {
 
             textRenderer.setScreenSize(window.getWidth(), window.getHeight());
             const float margin = 40.0f;
+            const float textSizePixels = textRenderer.getBasePixelHeight();
             const float baseline = static_cast<float>(window.getHeight()) - textRenderer.getAscent() - margin;
             textRenderer.renderText(
                 "Signed Distance Field Text\nRendering from TTF fonts",
                 margin,
                 baseline,
-                1.0f,
+                textSizePixels,
                 { 1.0f, 1.0f, 1.0f });
 
             glfwSwapBuffers(window.getNativeHandle());

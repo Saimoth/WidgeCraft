@@ -27,10 +27,11 @@ namespace WidgeCraft {
         TextRenderer& operator=(TextRenderer&& other) noexcept;
 
         void setScreenSize(int width, int height);
-        void renderText(const std::string& text, float x, float y, float scale = 1.0f, Color color = Color{1.0f, 1.0f, 1.0f});
+        void renderText(const std::string& text, float x, float y, float sizePixels = 0.0f, Color color = Color{1.0f, 1.0f, 1.0f});
 
         float getLineHeight() const { return m_lineHeight; }
         float getAscent() const { return m_ascent; }
+        float getBasePixelHeight() const { return m_basePixelHeight; }
 
     private:
         struct Glyph {
@@ -74,6 +75,7 @@ namespace WidgeCraft {
         float m_ascent = 0.0f;
         float m_descent = 0.0f;
         float m_lineHeight = 0.0f;
+        float m_basePixelHeight = 0.0f;
 
         int m_screenWidth = 0;
         int m_screenHeight = 0;
