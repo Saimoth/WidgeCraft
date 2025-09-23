@@ -41,6 +41,11 @@ target_include_directories(widgecraft
         ${CMAKE_CURRENT_SOURCE_DIR}/third_party
 )
 
+target_compile_definitions(widgecraft
+    PRIVATE
+        WIDGECRAFT_ASSET_DIR="${CMAKE_CURRENT_SOURCE_DIR}/assets"
+)
+
 target_link_libraries(widgecraft PRIVATE glfw glad)
 
 # ---------------- Warnings ----------------
