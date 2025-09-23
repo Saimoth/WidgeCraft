@@ -355,23 +355,32 @@ namespace WidgeCraft {
             int height = 0;
             int xoff = 0;
             int yoff = 0;
-            unsigned char* sdf = stbtt_GetGlyphSDF(
-                m_fontInfo.get(),
-                m_scale,
-                glyphIndex,
-                kPadding,
-                kOnEdgeValue,
-                kPixelDistScale,
-                &width,
-                &height,
-                &xoff,
-                &yoff);
+            unsigned char* sdf = nullptr;
 
-            if (!sdf) {
-                throw std::runtime_error("Failed to generate SDF for glyph");
+            const bool glyphHasContours = glyphIndex != 0 && stbtt_IsGlyphEmpty(m_fontInfo.get(), glyphIndex) == 0;
+
+            if (glyphHasContours) {
+                sdf = stbtt_GetGlyphSDF(
+                    m_fontInfo.get(),
+                    m_scale,
+                    glyphIndex,
+                    kPadding,
+                    kOnEdgeValue,
+                    kPixelDistScale,
+                    &width,
+                    &height,
+                    &xoff,
+                    &yoff);
+
+                if (!sdf) {
+                    width = 0;
+                    height = 0;
+                    xoff = 0;
+                    yoff = 0;
+                }
             }
 
-            if (width > 0 && height > 0) {
+            if (width > 0 && height > 0 && sdf) {
                 if (penX + width + kPadding > m_atlasWidth) {
                     penX = kPadding;
                     penY += rowHeight + kPadding;
@@ -416,7 +425,9 @@ namespace WidgeCraft {
                 penX += static_cast<int>(glyph.advance) + kPadding;
             }
 
-            stbtt_FreeSDF(sdf, nullptr);
+            if (sdf) {
+                stbtt_FreeSDF(sdf, nullptr);
+            }
         }
 
         if (auto it = m_glyphs.find('?'); it != m_glyphs.end()) {
