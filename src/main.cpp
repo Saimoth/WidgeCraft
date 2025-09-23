@@ -5,17 +5,20 @@
 #include <glad/glad.h>
 #include <GLFW/glfw3.h>
 
+#include <filesystem>
 #include <iostream>
 #include <string>
 
-int main() {
+int main(int argc, char* argv[]) {
+    (void)argc;
+    (void)argv;
     try {
         WidgeCraft::Window window(800, 600, "WidgeCraft Engine");
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        const std::string fontPath = "assets/fonts/Roboto-Regular.ttf";
-        WidgeCraft::TextRenderer textRenderer(window.getWidth(), window.getHeight(), fontPath, 64.0f);
+        const std::filesystem::path fontPath = std::filesystem::path(WIDGECRAFT_ASSET_DIR) / "fonts/Roboto-Regular.ttf";
+        WidgeCraft::TextRenderer textRenderer(window.getWidth(), window.getHeight(), fontPath.string(), 64.0f);
 
         while (!window.shouldClose()) {
             glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
