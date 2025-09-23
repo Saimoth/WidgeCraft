@@ -51,7 +51,8 @@ namespace WidgeCraft {
 
             void main() {
                 float distance = texture(uTexture, vTexCoord).r;
-                float alpha = smoothstep(uEdgeValue - uSmoothing, uEdgeValue + uSmoothing, distance);
+                float coverageWidth = max(uSmoothing, fwidth(distance));
+                float alpha = smoothstep(uEdgeValue - coverageWidth, uEdgeValue + coverageWidth, distance);
                 FragColor = vec4(uTextColor, alpha);
             }
         )";
@@ -235,7 +236,8 @@ namespace WidgeCraft {
         glUseProgram(m_shader);
         glUniformMatrix4fv(m_uniformProjection, 1, GL_FALSE, m_projection.data());
         glUniform3f(m_uniformTextColor, color.r, color.g, color.b);
-        glUniform1f(m_uniformSmoothing, m_smoothing / sizeScale);
+        const float minimumWidth = m_smoothing / sizeScale;
+        glUniform1f(m_uniformSmoothing, minimumWidth);
 
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_2D, m_texture);
