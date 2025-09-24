@@ -10,7 +10,10 @@
 namespace WidgeCraft {
 
     Window::Window(int width, int height, const std::string& title)
-        : m_window(nullptr), m_width(width), m_height(height) {
+        : m_window(nullptr)
+        , m_width(width)
+        , m_height(height)
+        , m_rootFrame("Window Frame") {
         if (!glfwInit()) {
             throw std::runtime_error("Failed to initialize GLFW");
         }
@@ -37,6 +40,10 @@ namespace WidgeCraft {
 
         glViewport(0, 0, width, height);
 
+        m_rootFrame.setDeletable(false);
+        m_rootFrame.setPosition(0.0f, 0.0f);
+        m_rootFrame.setSize(static_cast<float>(width), static_cast<float>(height));
+
         std::cout << "Window created: " << title << " (" << width << "x" << height << ")\n";
     }
 
@@ -58,6 +65,7 @@ namespace WidgeCraft {
     void Window::updateSize(int width, int height) {
         m_width = width;
         m_height = height;
+        m_rootFrame.setSize(static_cast<float>(width), static_cast<float>(height));
     }
 
     void Window::framebufferSizeCallback(GLFWwindow* window, int width, int height) {

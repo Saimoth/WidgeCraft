@@ -33,6 +33,8 @@ add_executable(widgecraft
     src/main.cpp
     src/Window.cpp
     src/TextRenderer.cpp
+    src/Frame.cpp
+    src/Widget.cpp
 )
 
 target_include_directories(widgecraft

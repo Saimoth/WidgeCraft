@@ -1,4 +1,6 @@
 #pragma once
+#include "WidgeCraft/Frame.hpp"
+
 #include <string>
 
 // Forward declaration of GLFW window type
@@ -19,10 +21,14 @@ namespace WidgeCraft {
         int getWidth() const { return m_width; }
         int getHeight() const { return m_height; }
 
+        Frame& getRootFrame() { return m_rootFrame; }
+        const Frame& getRootFrame() const { return m_rootFrame; }
+
     private:
         GLFWwindow* m_window;
         int m_width;
         int m_height;
+        Frame m_rootFrame;
 
         void updateSize(int width, int height);
         static void framebufferSizeCallback(GLFWwindow* window, int width, int height);
