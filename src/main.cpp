@@ -1,29 +1,16 @@
-#include "WidgeCraft/Window.hpp"
-#include "WidgeCraft/Frame.hpp"
-#include "WidgeCraft/ShapeRenderer.hpp"
+#include "WidgeCraft/WidgeCraft.hpp"
 #include "WidgeCraft/Widget.hpp"
-#include "WidgeCraft/TextRenderer.hpp"
 
-// Order matters: glad before glfw
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-
-#include <filesystem>
 #include <iostream>
-#include <string>
 
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
-    try {
-        WidgeCraft::Window window(800, 600, "WidgeCraft Engine");
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-        const std::filesystem::path fontPath = std::filesystem::path(WIDGECRAFT_ASSET_DIR) / "fonts/Roboto-Regular.ttf";
-        WidgeCraft::TextRenderer textRenderer(window.getWidth(), window.getHeight(), fontPath.string(), 64.0f);
-        WidgeCraft::ShapeRenderer shapeRenderer;
-        WidgeCraft::Frame& rootFrame = window.getRootFrame();
+    try {
+        WidgeCraft::WidgeCraft wc("WidgeCraft Engine", 800, 600);
+
+        WidgeCraft::Frame& rootFrame = wc.getRootFrame();
         rootFrame.setBorderVisible(false);
 
         WidgeCraft::Frame& headerFrame = rootFrame.createChildFrame("Header");
@@ -37,16 +24,14 @@ int main(int argc, char* argv[]) {
         actionButton.setTextColor({ 0.8f, 0.9f, 1.0f });
         actionButton.setBackgroundVisible(false);
 
-        const float baseTextSize = textRenderer.getBasePixelHeight();
+        const float baseTextSize = wc.getTextRenderer().getBasePixelHeight();
         titleLabel.setTextSize(baseTextSize);
         actionButton.setTextSize(baseTextSize * 0.5f);
 
-        while (!window.shouldClose()) {
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
+        wc.setUpdateCallback([&](WidgeCraft::WidgeCraft& app) {
+            auto& window = app.getWindow();
+            auto& textRenderer = app.getTextRenderer();
 
-            textRenderer.setScreenSize(window.getWidth(), window.getHeight());
-            shapeRenderer.setScreenSize(static_cast<float>(window.getWidth()), static_cast<float>(window.getHeight()));
             const float margin = 40.0f;
             const float headerHeight = textRenderer.getLineHeight() * 3.0f;
             headerFrame.setSize(static_cast<float>(window.getWidth()) - margin * 2.0f, headerHeight);
@@ -55,12 +40,9 @@ int main(int argc, char* argv[]) {
             const float headerTopBaseline = headerFrame.getSize().y - textRenderer.getAscent() - 10.0f;
             titleLabel.setPosition(0.0f, headerTopBaseline);
             actionButton.setPosition(0.0f, headerTopBaseline - textRenderer.getLineHeight());
+        });
 
-            rootFrame.render(textRenderer, shapeRenderer);
-
-            glfwSwapBuffers(window.getNativeHandle());
-            window.pollEvents();
-        }
+        wc.Run();
     }
     catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
@@ -70,3 +52,4 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
