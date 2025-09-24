@@ -11,7 +11,7 @@
 namespace WidgeCraft {
 
     class Frame;
-
+    class ShapeRenderer;
     class Widget {
     public:
         explicit Widget(std::string name);
@@ -29,16 +29,18 @@ namespace WidgeCraft {
         void setSize(float width, float height);
         void setSize(const Size& size) { setSize(size.x, size.y); }
         Size getSize() const { return m_size; }
+        bool hasExplicitSize() const { return m_hasExplicitSize; }
 
         Frame* getParent() const { return m_parent; }
 
-        virtual void render(Frame& frame, TextRenderer& textRenderer) = 0;
+        virtual void render(Frame& frame, TextRenderer& textRenderer, ShapeRenderer& shapeRenderer) = 0;
 
         friend class Frame;
         friend class Widgets;
 
     protected:
         void setParent(Frame* parent);
+        void setComputedSize(float width, float height);
 
     private:
         std::string m_name;
@@ -46,6 +48,7 @@ namespace WidgeCraft {
         bool m_visible = true;
         Position m_position{};
         Size m_size{};
+        bool m_hasExplicitSize = false;
     };
 
     class Widgets {
@@ -83,7 +86,7 @@ namespace WidgeCraft {
         void setTextSize(float sizePixels) { m_textSizePixels = sizePixels; }
         float getTextSize() const { return m_textSizePixels; }
 
-        void render(Frame& frame, TextRenderer& textRenderer) override;
+        void render(Frame& frame, TextRenderer& textRenderer, ShapeRenderer& shapeRenderer) override;
 
     private:
         std::string m_text;
@@ -110,14 +113,14 @@ namespace WidgeCraft {
         void setBackgroundColor(Color color) { m_backgroundColor = color; }
         Color getBackgroundColor() const { return m_backgroundColor; }
 
-        void render(Frame& frame, TextRenderer& textRenderer) override;
+        void render(Frame& frame, TextRenderer& textRenderer, ShapeRenderer& shapeRenderer) override;
 
     private:
         std::string m_text;
         TextRenderer::Color m_textColor{ 1.0f, 1.0f, 1.0f };
         float m_textSizePixels = 0.0f;
         bool m_showBackground = true;
-        Color m_backgroundColor{};
+        Color m_backgroundColor{ Colors::Grey };
     };
 
     template <typename T, typename... Args>

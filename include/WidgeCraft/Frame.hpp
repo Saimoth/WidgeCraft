@@ -11,6 +11,8 @@
 
 namespace WidgeCraft {
 
+    class ShapeRenderer;
+
     class Frame {
     public:
         class TextBatch {
@@ -61,6 +63,9 @@ namespace WidgeCraft {
         void setSize(const Size& size) { setSize(size.x, size.y); }
         Size getSize() const { return m_size; }
 
+        void setAnchor(Anchor anchor) { m_anchor = anchor; }
+        Anchor getAnchor() const { return m_anchor; }
+
         Position getAbsolutePosition() const;
 
         Frame& createChildFrame(const std::string& name);
@@ -80,10 +85,12 @@ namespace WidgeCraft {
         void setDeletable(bool deletable) { m_deletable = deletable; }
         bool canBeDeleted() const { return m_deletable; }
 
-        void render(TextRenderer& textRenderer);
+        void render(TextRenderer& textRenderer, ShapeRenderer& shapeRenderer);
 
     private:
         void clearTextBatchesRecursive();
+        Frame* getRoot();
+        const Frame* getRoot() const;
 
         std::string m_name;
         Frame* m_parent = nullptr;
@@ -91,9 +98,10 @@ namespace WidgeCraft {
         bool m_showBackground = true;
         bool m_showBorder = false;
         bool m_deletable = true;
-        Color m_backgroundColor{};
-        Position m_position{};
+        Color m_backgroundColor{ Colors::Grey };
+        Position m_position{ 10.0f, 10.0f };
         Size m_size{};
+        Anchor m_anchor = Anchor::Center;
         TextBatch m_textBatch;
         Widgets m_widgets;
         std::vector<std::unique_ptr<Frame>> m_children;

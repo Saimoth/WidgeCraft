@@ -3,6 +3,7 @@
 #include <glad/glad.h>
 
 #include <algorithm>
+#include <limits>
 #include <fstream>
 #include <stdexcept>
 #include <string>
@@ -311,6 +312,121 @@ namespace WidgeCraft {
         glBindVertexArray(0);
         glBindTexture(GL_TEXTURE_2D, 0);
         glUseProgram(0);
+    }
+
+    std::optional<TextRenderer::TextBounds> TextRenderer::measureTextBounds(const std::string& text, float sizePixels) const {
+        if (text.empty() || m_basePixelHeight <= 0.0f) {
+            return std::nullopt;
+        }
+
+        if (sizePixels <= 0.0f) {
+            sizePixels = m_basePixelHeight;
+        }
+
+        if (sizePixels <= 0.0f) {
+            return std::nullopt;
+        }
+
+        const float sizeScale = sizePixels / m_basePixelHeight;
+
+        float cursorX = 0.0f;
+        float cursorY = 0.0f;
+        float lowestBaseline = 0.0f;
+        float maxLineWidth = 0.0f;
+        bool hasGeometry = false;
+
+        float minX = std::numeric_limits<float>::max();
+        float minY = std::numeric_limits<float>::max();
+        float maxX = std::numeric_limits<float>::lowest();
+        float maxY = std::numeric_limits<float>::lowest();
+
+        for (size_t i = 0; i < text.size(); ++i) {
+            const char c = text[i];
+            if (c == '\n') {
+                maxLineWidth = std::max(maxLineWidth, cursorX);
+                cursorX = 0.0f;
+                cursorY -= m_lineHeight * sizeScale;
+                lowestBaseline = std::min(lowestBaseline, cursorY);
+                continue;
+            }
+
+            const Glyph* glyph = nullptr;
+            if (auto it = m_glyphs.find(c); it != m_glyphs.end()) {
+                glyph = &it->second;
+            } else {
+                glyph = m_fallbackGlyph;
+            }
+
+            if (!glyph) {
+                continue;
+            }
+
+            const float xPos = cursorX + glyph->xOffset * sizeScale;
+            const float yPos = cursorY - (glyph->yOffset + glyph->height) * sizeScale;
+            const float w = glyph->width * sizeScale;
+            const float h = glyph->height * sizeScale;
+
+            if (w > 0.0f && h > 0.0f) {
+                hasGeometry = true;
+                minX = std::min(minX, xPos);
+                minY = std::min(minY, yPos);
+                maxX = std::max(maxX, xPos + w);
+                maxY = std::max(maxY, yPos + h);
+            }
+
+            cursorX += glyph->advance * sizeScale;
+            maxLineWidth = std::max(maxLineWidth, cursorX);
+
+            if (i + 1 < text.size()) {
+                const char nextChar = text[i + 1];
+                if (nextChar != '\n') {
+                    int nextGlyphIndex = 0;
+                    if (auto itNext = m_glyphs.find(nextChar); itNext != m_glyphs.end()) {
+                        nextGlyphIndex = itNext->second.glyphIndex;
+                    } else if (m_fallbackGlyph) {
+                        nextGlyphIndex = m_fallbackGlyph->glyphIndex;
+                    }
+
+                    if (glyph->glyphIndex >= 0 && nextGlyphIndex >= 0) {
+                        int kern = stbtt_GetGlyphKernAdvance(m_fontInfo.get(), glyph->glyphIndex, nextGlyphIndex);
+                        cursorX += static_cast<float>(kern) * m_scale * sizeScale;
+                        maxLineWidth = std::max(maxLineWidth, cursorX);
+                    }
+                }
+            }
+        }
+
+        maxLineWidth = std::max(maxLineWidth, cursorX);
+
+        if (!hasGeometry) {
+            if (maxLineWidth <= 0.0f) {
+                return std::nullopt;
+            }
+
+            minX = 0.0f;
+            maxX = maxLineWidth;
+        } else {
+            minX = std::min(minX, 0.0f);
+            maxX = std::max(maxX, maxLineWidth);
+        }
+
+        const float top = m_ascent * sizeScale;
+        const float bottom = lowestBaseline + m_descent * sizeScale;
+
+        if (!hasGeometry) {
+            minY = bottom;
+            maxY = top;
+        } else {
+            minY = std::min(minY, bottom);
+            maxY = std::max(maxY, top);
+        }
+
+        TextBounds bounds{};
+        bounds.minX = minX;
+        bounds.minY = minY;
+        bounds.maxX = maxX;
+        bounds.maxY = maxY;
+        return bounds;
     }
 
     bool TextRenderer::loadFont(const std::string& fontPath) {
