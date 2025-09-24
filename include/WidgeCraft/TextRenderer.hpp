@@ -2,6 +2,7 @@
 
 #include <array>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -18,6 +19,13 @@ namespace WidgeCraft {
             float b = 1.0f;
         };
 
+        struct TextBounds {
+            float minX = 0.0f;
+            float minY = 0.0f;
+            float maxX = 0.0f;
+            float maxY = 0.0f;
+        };
+
         TextRenderer(int screenWidth, int screenHeight, const std::string& fontPath, float fontPixelHeight = 48.0f);
         ~TextRenderer();
 
@@ -28,6 +36,8 @@ namespace WidgeCraft {
 
         void setScreenSize(int width, int height);
         void renderText(const std::string& text, float x, float y, float sizePixels = 0.0f, Color color = Color{1.0f, 1.0f, 1.0f});
+
+        std::optional<TextBounds> measureTextBounds(const std::string& text, float sizePixels = 0.0f) const;
 
         float getLineHeight() const { return m_lineHeight; }
         float getAscent() const { return m_ascent; }

@@ -1,5 +1,6 @@
 #include "WidgeCraft/Window.hpp"
 #include "WidgeCraft/Frame.hpp"
+#include "WidgeCraft/ShapeRenderer.hpp"
 #include "WidgeCraft/Widget.hpp"
 #include "WidgeCraft/TextRenderer.hpp"
 
@@ -21,9 +22,8 @@ int main(int argc, char* argv[]) {
 
         const std::filesystem::path fontPath = std::filesystem::path(WIDGECRAFT_ASSET_DIR) / "fonts/Roboto-Regular.ttf";
         WidgeCraft::TextRenderer textRenderer(window.getWidth(), window.getHeight(), fontPath.string(), 64.0f);
-
+        WidgeCraft::ShapeRenderer shapeRenderer;
         WidgeCraft::Frame& rootFrame = window.getRootFrame();
-        rootFrame.setBackgroundVisible(false);
         rootFrame.setBorderVisible(false);
 
         WidgeCraft::Frame& headerFrame = rootFrame.createChildFrame("Header");
@@ -46,6 +46,7 @@ int main(int argc, char* argv[]) {
             glClear(GL_COLOR_BUFFER_BIT);
 
             textRenderer.setScreenSize(window.getWidth(), window.getHeight());
+            shapeRenderer.setScreenSize(static_cast<float>(window.getWidth()), static_cast<float>(window.getHeight()));
             const float margin = 40.0f;
             const float headerHeight = textRenderer.getLineHeight() * 3.0f;
             headerFrame.setSize(static_cast<float>(window.getWidth()) - margin * 2.0f, headerHeight);
@@ -55,7 +56,7 @@ int main(int argc, char* argv[]) {
             titleLabel.setPosition(0.0f, headerTopBaseline);
             actionButton.setPosition(0.0f, headerTopBaseline - textRenderer.getLineHeight());
 
-            rootFrame.render(textRenderer);
+            rootFrame.render(textRenderer, shapeRenderer);
 
             glfwSwapBuffers(window.getNativeHandle());
             window.pollEvents();

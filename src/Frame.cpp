@@ -1,12 +1,12 @@
 #include "WidgeCraft/Frame.hpp"
 
+#include "WidgeCraft/ShapeRenderer.hpp"
 #include "WidgeCraft/TextRenderer.hpp"
 
 #include <algorithm>
 #include <utility>
 
 namespace WidgeCraft {
-
     Frame::Frame(std::string name, Frame* parent)
         : m_name(std::move(name)), m_parent(parent), m_widgets(*this) {
     }
@@ -38,7 +38,49 @@ namespace WidgeCraft {
         }
 
         const Position parentPosition = m_parent->getAbsolutePosition();
-        return { parentPosition.x + m_position.x, parentPosition.y + m_position.y };
+        const Size parentSize = m_parent->getSize();
+        Position result = parentPosition;
+
+        switch (m_anchor) {
+        case Anchor::TopLeft:
+            result.x += m_position.x;
+            result.y += parentSize.y - m_position.y - m_size.y;
+            break;
+        case Anchor::TopCenter:
+            result.x += (parentSize.x - m_size.x) * 0.5f + m_position.x;
+            result.y += parentSize.y - m_position.y - m_size.y;
+            break;
+        case Anchor::TopRight:
+            result.x += parentSize.x - m_position.x - m_size.x;
+            result.y += parentSize.y - m_position.y - m_size.y;
+            break;
+        case Anchor::CenterLeft:
+            result.x += m_position.x;
+            result.y += (parentSize.y - m_size.y) * 0.5f + m_position.y;
+            break;
+        case Anchor::Center:
+            result.x += (parentSize.x - m_size.x) * 0.5f;
+            result.y += (parentSize.y - m_size.y) * 0.5f;
+            break;
+        case Anchor::CenterRight:
+            result.x += parentSize.x - m_position.x - m_size.x;
+            result.y += (parentSize.y - m_size.y) * 0.5f + m_position.y;
+            break;
+        case Anchor::BottomLeft:
+            result.x += m_position.x;
+            result.y += m_position.y;
+            break;
+        case Anchor::BottomCenter:
+            result.x += (parentSize.x - m_size.x) * 0.5f + m_position.x;
+            result.y += m_position.y;
+            break;
+        case Anchor::BottomRight:
+            result.x += parentSize.x - m_position.x - m_size.x;
+            result.y += m_position.y;
+            break;
+        }
+
+        return result;
     }
 
     Frame& Frame::createChildFrame(const std::string& name) {
@@ -61,19 +103,23 @@ namespace WidgeCraft {
         return true;
     }
 
-    void Frame::render(TextRenderer& textRenderer) {
+    void Frame::render(TextRenderer& textRenderer, ShapeRenderer& shapeRenderer) {
         if (!m_visible) {
             clearTextBatchesRecursive();
             return;
         }
 
+        const Position basePosition = getAbsolutePosition();
+        if (m_showBackground && m_size.x > 0.0f && m_size.y > 0.0f) {
+            shapeRenderer.drawFilledRect(basePosition.x, basePosition.y, m_size.x, m_size.y, m_backgroundColor);
+        }
+
         for (const auto& widget : m_widgets) {
             if (widget && widget->isVisible()) {
-                widget->render(*this, textRenderer);
+                widget->render(*this, textRenderer, shapeRenderer);
             }
         }
 
-        const Position basePosition = getAbsolutePosition();
         for (const auto& command : m_textBatch.getCommands()) {
             float size = command.sizePixels;
             if (size <= 0.0f) {
@@ -92,8 +138,12 @@ namespace WidgeCraft {
 
         for (auto& child : m_children) {
             if (child) {
-                child->render(textRenderer);
+                child->render(textRenderer, shapeRenderer);
             }
+        }
+
+        if (m_showBorder && m_size.x > 0.0f && m_size.y > 0.0f) {
+            shapeRenderer.drawRectOutline(basePosition.x, basePosition.y, m_size.x, m_size.y, 2.0f, Colors::Black);
         }
     }
 
@@ -104,6 +154,22 @@ namespace WidgeCraft {
                 child->clearTextBatchesRecursive();
             }
         }
+    }
+
+    Frame* Frame::getRoot() {
+        Frame* current = this;
+        while (current && current->m_parent) {
+            current = current->m_parent;
+        }
+        return current;
+    }
+
+    const Frame* Frame::getRoot() const {
+        const Frame* current = this;
+        while (current && current->m_parent) {
+            current = current->m_parent;
+        }
+        return current;
     }
 
     void Frame::TextBatch::addText(std::string text, float x, float y, float sizePixels, TextRenderer::Color color) {

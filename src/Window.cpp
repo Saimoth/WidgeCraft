@@ -41,6 +41,10 @@ namespace WidgeCraft {
         glViewport(0, 0, width, height);
 
         m_rootFrame.setDeletable(false);
+        m_rootFrame.setAnchor(Anchor::TopLeft);
+        m_rootFrame.setBackgroundColor(Colors::DarkGrey);
+        m_rootFrame.setBorderVisible(false);
+        m_rootFrame.setBackgroundVisible(true);
         m_rootFrame.setPosition(0.0f, 0.0f);
         m_rootFrame.setSize(static_cast<float>(width), static_cast<float>(height));
 
