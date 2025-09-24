@@ -36,6 +36,7 @@ add_executable(widgecraft
     src/ShapeRenderer.cpp
     src/Frame.cpp
     src/Widget.cpp
+    src/WidgeCraft.cpp
 )
 
 target_include_directories(widgecraft

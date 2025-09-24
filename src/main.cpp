@@ -1,66 +1,54 @@
-#include "WidgeCraft/Window.hpp"
-#include "WidgeCraft/Frame.hpp"
-#include "WidgeCraft/ShapeRenderer.hpp"
-#include "WidgeCraft/Widget.hpp"
-#include "WidgeCraft/TextRenderer.hpp"
+#include "WidgeCraft/WidgeCraft.hpp"
 
-// Order matters: glad before glfw
-#include <glad/glad.h>
-#include <GLFW/glfw3.h>
-
-#include <filesystem>
 #include <iostream>
 #include <string>
 
 int main(int argc, char* argv[]) {
     (void)argc;
     (void)argv;
+
     try {
-        WidgeCraft::Window window(800, 600, "WidgeCraft Engine");
-        glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        WidgeCraft::WidgeCraft wc("WidgeCraft Engine", 800, 600);
 
-        const std::filesystem::path fontPath = std::filesystem::path(WIDGECRAFT_ASSET_DIR) / "fonts/Roboto-Regular.ttf";
-        WidgeCraft::TextRenderer textRenderer(window.getWidth(), window.getHeight(), fontPath.string(), 64.0f);
-        WidgeCraft::ShapeRenderer shapeRenderer;
-        WidgeCraft::Frame& rootFrame = window.getRootFrame();
-        rootFrame.setBorderVisible(false);
+        const std::string rootFrameName = wc.getRootFrameName();
+        const std::string headerFrameName = "Header";
+        const std::string titleWidgetName = "TitleLabel";
+        const std::string actionWidgetName = "ActionButton";
 
-        WidgeCraft::Frame& headerFrame = rootFrame.createChildFrame("Header");
-        headerFrame.setBackgroundVisible(false);
-        headerFrame.setBorderVisible(false);
+        wc.onStartup([&](WidgeCraft::WidgeCraft& app) {
+            app.frameSetBorderVisible(rootFrameName, false);
 
-        auto& titleLabel = headerFrame.addWidget<WidgeCraft::Label>("TitleLabel", "WidgeCraft Engine");
-        auto& actionButton = headerFrame.addWidget<WidgeCraft::Button>("ActionButton", "Start Crafting");
+            app.addFrame(headerFrameName);
+            app.frameSetBackgroundVisible(headerFrameName, false);
+            app.frameSetBorderVisible(headerFrameName, false);
 
-        titleLabel.setColor({ 1.0f, 1.0f, 0.9f });
-        actionButton.setTextColor({ 0.8f, 0.9f, 1.0f });
-        actionButton.setBackgroundVisible(false);
+            app.addLabel(headerFrameName, titleWidgetName, "WidgeCraft Engine");
+            app.addButton(headerFrameName, actionWidgetName, "Start Crafting");
 
-        const float baseTextSize = textRenderer.getBasePixelHeight();
-        titleLabel.setTextSize(baseTextSize);
-        actionButton.setTextSize(baseTextSize * 0.5f);
+            app.widgetSetColor(headerFrameName, titleWidgetName, { 1.0f, 1.0f, 0.9f });
+            app.widgetSetTextColor(headerFrameName, actionWidgetName, { 0.8f, 0.9f, 1.0f });
+            app.widgetSetBackgroundVisible(headerFrameName, actionWidgetName, false);
 
-        while (!window.shouldClose()) {
-            glClearColor(0.2f, 0.3f, 0.3f, 1.0f);
-            glClear(GL_COLOR_BUFFER_BIT);
+            const float baseTextSize = app.getTextRenderer().getBasePixelHeight();
+            app.widgetSetTextSize(headerFrameName, titleWidgetName, baseTextSize);
+            app.widgetSetTextSize(headerFrameName, actionWidgetName, baseTextSize * 0.5f);
+        });
 
-            textRenderer.setScreenSize(window.getWidth(), window.getHeight());
-            shapeRenderer.setScreenSize(static_cast<float>(window.getWidth()), static_cast<float>(window.getHeight()));
+        wc.onUpdate([&](WidgeCraft::WidgeCraft& app) {
+            auto& window = app.getWindow();
+            auto& textRenderer = app.getTextRenderer();
+
             const float margin = 40.0f;
             const float headerHeight = textRenderer.getLineHeight() * 3.0f;
-            headerFrame.setSize(static_cast<float>(window.getWidth()) - margin * 2.0f, headerHeight);
-            headerFrame.setPosition(margin, static_cast<float>(window.getHeight()) - headerHeight - margin);
+            app.frameSetSize(headerFrameName, static_cast<float>(window.getWidth()) - margin * 2.0f, headerHeight);
+            app.frameSetPosition(headerFrameName, margin, static_cast<float>(window.getHeight()) - headerHeight - margin);
 
-            const float headerTopBaseline = headerFrame.getSize().y - textRenderer.getAscent() - 10.0f;
-            titleLabel.setPosition(0.0f, headerTopBaseline);
-            actionButton.setPosition(0.0f, headerTopBaseline - textRenderer.getLineHeight());
+            const float headerTopBaseline = app.frameGetSize(headerFrameName).y - textRenderer.getAscent() - 10.0f;
+            app.widgetSetPosition(headerFrameName, titleWidgetName, { 0.0f, headerTopBaseline });
+            app.widgetSetPosition(headerFrameName, actionWidgetName, { 0.0f, headerTopBaseline - textRenderer.getLineHeight() });
+        });
 
-            rootFrame.render(textRenderer, shapeRenderer);
-
-            glfwSwapBuffers(window.getNativeHandle());
-            window.pollEvents();
-        }
+        wc.Run();
     }
     catch (const std::exception& e) {
         std::cerr << "Error: " << e.what() << "\n";
@@ -70,3 +58,4 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
+
