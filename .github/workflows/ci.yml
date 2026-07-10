@@ -1,20 +1,23 @@
-name: CI (Win32 Release)
+name: CI (VS2022 Win32 Release)
 
 on:
   push:
   pull_request:
 
 jobs:
-  build:
+  build-and-test:
     runs-on: windows-latest
-    steps:
-      - uses: actions/checkout@v4
+    timeout-minutes: 20
 
-      - name: Configure (VS2022 Win32)
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Configure Visual Studio 2022 Win32
         run: cmake --preset vs2022-win32-release
 
-      - name: Build (Release)
+      - name: Build Release
         run: cmake --build --preset build-release --parallel
 
-      - name: Run app
-        run: .\build\win32-release\Release\widgecraft.exe
+      - name: Run non-graphical tests
+        run: ctest --preset test-release
