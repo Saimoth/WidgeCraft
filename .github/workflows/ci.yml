@@ -6,7 +6,9 @@ on:
 
 jobs:
   build-and-test:
-    runs-on: windows-latest
+    # Pin the runner because windows-latest now carries VS2026, while the
+    # supported WidgeCraft preset intentionally generates a VS2022 solution.
+    runs-on: windows-2022
     timeout-minutes: 20
 
     steps:
