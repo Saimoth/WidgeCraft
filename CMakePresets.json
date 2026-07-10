@@ -5,17 +5,21 @@
     {
       "name": "vs2022-win32-release",
       "displayName": "VS2022 Win32 Release",
+      "description": "Generates the supported 32-bit Visual Studio 2022 solution.",
       "generator": "Visual Studio 17 2022",
       "architecture": { "value": "Win32", "strategy": "set" },
       "binaryDir": "${sourceDir}/build/win32-release",
       "cacheVariables": {
-        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install"
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/install",
+        "WIDGECRAFT_BUILD_DEMO": "ON",
+        "WIDGECRAFT_BUILD_TESTS": "ON"
       }
     }
   ],
   "buildPresets": [
     {
       "name": "build-release",
+      "displayName": "Build Win32 Release",
       "configurePreset": "vs2022-win32-release",
       "configuration": "Release"
     }
@@ -23,6 +27,7 @@
   "testPresets": [
     {
       "name": "test-release",
+      "displayName": "Test Win32 Release",
       "configurePreset": "vs2022-win32-release",
       "configuration": "Release",
       "output": { "outputOnFailure": true }
