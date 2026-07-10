@@ -1,23 +1,29 @@
 #include "WidgeCraft/WidgeCraft.hpp"
 
-#include "WidgeCraft/ShapeRenderer.hpp"
-#include "WidgeCraft/TextRenderer.hpp"
-
-// Order matters: glad before glfw
+// GLAD must be included before GLFW.
 #include <glad/glad.h>
-#include <GLFW/glfw3.h>
 
+#include <algorithm>
+#include <chrono>
 #include <filesystem>
+#include <thread>
 #include <utility>
 
 namespace WidgeCraft {
 
     namespace {
         std::string resolveDefaultFontPath() {
-            const std::filesystem::path defaultPath = std::filesystem::path(WIDGECRAFT_ASSET_DIR) / "fonts/Roboto-Regular.ttf";
-            return defaultPath.string();
+            const std::filesystem::path configuredPath =
+                std::filesystem::path(WIDGECRAFT_ASSET_DIR) / "fonts/Roboto-Regular.ttf";
+            if (std::filesystem::exists(configuredPath)) {
+                return configuredPath.string();
+            }
+
+            const std::filesystem::path localPath =
+                std::filesystem::current_path() / "assets/fonts/Roboto-Regular.ttf";
+            return localPath.string();
         }
-    }
+    } // namespace
 
     WidgeCraft::WidgeCraft(std::string title, int width, int height, std::string fontPath, float fontPixelHeight)
         : m_window(width, height, std::move(title))
@@ -26,19 +32,42 @@ namespace WidgeCraft {
         initializeGraphics();
     }
 
-    void WidgeCraft::Run() {
+    void WidgeCraft::Run(int targetFramesPerSecond) {
+        using Clock = std::chrono::steady_clock;
+        using Seconds = std::chrono::duration<double>;
+
+        m_targetFrameRate = std::max(0, targetFramesPerSecond);
+        auto previousFrame = Clock::now();
+
         while (!m_window.shouldClose()) {
+            const auto frameStart = Clock::now();
+            m_deltaTime = static_cast<float>(std::min(0.25, Seconds(frameStart - previousFrame).count()));
+            previousFrame = frameStart;
+            m_elapsedTime += static_cast<double>(m_deltaTime);
+
+            m_window.pollEvents();
             Update();
             Render();
+            m_window.swapBuffers();
 
-            glfwSwapBuffers(m_window.getNativeHandle());
-            m_window.pollEvents();
+            if (m_targetFrameRate > 0 && !m_window.isVSyncEnabled()) {
+                const Seconds targetDuration(1.0 / static_cast<double>(m_targetFrameRate));
+                while (Clock::now() - frameStart < targetDuration) {
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                }
+            }
         }
+    }
+
+    void WidgeCraft::Stop() {
+        m_window.requestClose();
     }
 
     void WidgeCraft::Update() {
         m_textRenderer.setScreenSize(m_window.getWidth(), m_window.getHeight());
-        m_shapeRenderer.setScreenSize(static_cast<float>(m_window.getWidth()), static_cast<float>(m_window.getHeight()));
+        m_shapeRenderer.setScreenSize(
+            static_cast<float>(m_window.getWidth()),
+            static_cast<float>(m_window.getHeight()));
 
         if (m_updateCallback) {
             m_updateCallback(*this);
@@ -47,27 +76,31 @@ namespace WidgeCraft {
 
     void WidgeCraft::Render() {
         glClearColor(m_clearColor.r, m_clearColor.g, m_clearColor.b, m_clearColor.a);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        m_shapeRenderer.beginFrame();
+        m_textRenderer.beginFrame();
 
         if (m_renderCallback) {
             m_renderCallback(*this);
         }
 
-        m_window.getRootFrame().render(m_textRenderer, m_shapeRenderer);
+        m_shapeRenderer.flush();
+        m_textRenderer.flush();
+        m_window.getRootFrame().render(m_textRenderer, m_shapeRenderer, m_window.getInput());
+        m_shapeRenderer.flush();
+        m_textRenderer.flush();
     }
 
     void WidgeCraft::initializeGraphics() {
         glEnable(GL_BLEND);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_CULL_FACE);
+        glDisable(GL_DEPTH_TEST);
     }
 
     std::string WidgeCraft::resolveFontPath(const std::string& fontPath) {
-        if (!fontPath.empty()) {
-            return fontPath;
-        }
-
-        return resolveDefaultFontPath();
+        return fontPath.empty() ? resolveDefaultFontPath() : fontPath;
     }
 
 } // namespace WidgeCraft
-
