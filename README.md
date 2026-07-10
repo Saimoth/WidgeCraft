@@ -57,7 +57,7 @@ panel.setAnchor(WidgeCraft::Anchor::TopRight);
 panel.setPosition(20.0f, 20.0f);
 panel.setSize(300.0f, 220.0f);
 
-	auto& button = panel.addWidget<WidgeCraft::Button>("Apply", "Apply");
+auto& button = panel.addWidget<WidgeCraft::Button>("Apply", "Apply");
 button.setAnchor(WidgeCraft::Anchor::BottomRight);
 button.setPosition(16.0f, 16.0f);
 button.setSize(100.0f, 38.0f);
@@ -157,7 +157,7 @@ assets/                 Fonts and future engine assets
 include/WidgeCraft/     Public engine headers
 src/                    Engine implementation and showcase
 third_party/            Header-only third-party source
- tests/                  Non-graphical unit tests
+tests/                  Non-graphical unit tests
 .github/workflows/      Win32 CI build and tests
 ```
 
