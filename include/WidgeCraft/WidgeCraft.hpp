@@ -1,5 +1,7 @@
 #pragma once
 
+#include "WidgeCraft/Input.hpp"
+#include "WidgeCraft/Raycast.hpp"
 #include "WidgeCraft/ShapeRenderer.hpp"
 #include "WidgeCraft/TextRenderer.hpp"
 #include "WidgeCraft/Types.hpp"
@@ -20,11 +22,11 @@ namespace WidgeCraft {
 
         WidgeCraft(const WidgeCraft&) = delete;
         WidgeCraft& operator=(const WidgeCraft&) = delete;
-        WidgeCraft(WidgeCraft&&) noexcept = default;
-        WidgeCraft& operator=(WidgeCraft&&) noexcept = default;
+        WidgeCraft(WidgeCraft&&) = delete;
+        WidgeCraft& operator=(WidgeCraft&&) = delete;
 
-        void Run();
-
+        void Run(int targetFramesPerSecond = 60);
+        void Stop();
         void Update();
         void Render();
 
@@ -34,8 +36,14 @@ namespace WidgeCraft {
         void setClearColor(Color color) { m_clearColor = color; }
         Color getClearColor() const { return m_clearColor; }
 
+        float getDeltaTime() const { return m_deltaTime; }
+        double getElapsedTime() const { return m_elapsedTime; }
+        int getTargetFrameRate() const { return m_targetFrameRate; }
+
         Window& getWindow() { return m_window; }
         const Window& getWindow() const { return m_window; }
+        Input& getInput() { return m_window.getInput(); }
+        const Input& getInput() const { return m_window.getInput(); }
 
         Frame& getRootFrame() { return m_window.getRootFrame(); }
         const Frame& getRootFrame() const { return m_window.getRootFrame(); }
@@ -53,10 +61,12 @@ namespace WidgeCraft {
         Window m_window;
         TextRenderer m_textRenderer;
         ShapeRenderer m_shapeRenderer;
-        Color m_clearColor{ 0.2f, 0.3f, 0.3f, 1.0f };
+        Color m_clearColor{ 0.055f, 0.070f, 0.095f, 1.0f };
         UpdateCallback m_updateCallback;
         RenderCallback m_renderCallback;
+        float m_deltaTime = 0.0f;
+        double m_elapsedTime = 0.0;
+        int m_targetFrameRate = 60;
     };
 
 } // namespace WidgeCraft
-
