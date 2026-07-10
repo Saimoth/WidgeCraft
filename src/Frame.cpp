@@ -1,21 +1,39 @@
 #include "WidgeCraft/Frame.hpp"
 
 #include "WidgeCraft/ShapeRenderer.hpp"
-#include "WidgeCraft/TextRenderer.hpp"
+
+#include <glad/glad.h>
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace WidgeCraft {
+
+    namespace {
+        void applyScissor(const Rect& clip) {
+            const int x = static_cast<int>(std::floor(clip.x));
+            const int y = static_cast<int>(std::floor(clip.y));
+            const int right = static_cast<int>(std::ceil(clip.right()));
+            const int top = static_cast<int>(std::ceil(clip.top()));
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(x, y, std::max(0, right - x), std::max(0, top - y));
+        }
+    } // namespace
+
     Frame::Frame(std::string name, Frame* parent)
-        : m_name(std::move(name)), m_parent(parent), m_widgets(*this) {
+        : m_name(std::move(name))
+        , m_parent(parent)
+        , m_widgets(*this) {
+        if (m_name.empty()) {
+            throw std::invalid_argument("Frame names cannot be empty");
+        }
     }
 
     void Frame::setVisible(bool visible) {
         if (m_visible == visible) {
             return;
         }
-
         m_visible = visible;
         if (!m_visible) {
             clearTextBatchesRecursive();
@@ -23,13 +41,11 @@ namespace WidgeCraft {
     }
 
     void Frame::setPosition(float x, float y) {
-        m_position.x = x;
-        m_position.y = y;
+        m_position = { x, y };
     }
 
     void Frame::setSize(float width, float height) {
-        m_size.x = width;
-        m_size.y = height;
+        m_size = { std::max(0.0f, width), std::max(0.0f, height) };
     }
 
     Position Frame::getAbsolutePosition() const {
@@ -37,113 +53,165 @@ namespace WidgeCraft {
             return m_position;
         }
 
-        const Position parentPosition = m_parent->getAbsolutePosition();
-        const Size parentSize = m_parent->getSize();
-        Position result = parentPosition;
-
+        const Rect parentRect = m_parent->getAbsoluteRect();
+        Position result{ parentRect.x, parentRect.y };
         switch (m_anchor) {
         case Anchor::TopLeft:
             result.x += m_position.x;
-            result.y += parentSize.y - m_position.y - m_size.y;
+            result.y += parentRect.height - m_position.y - m_size.y;
             break;
         case Anchor::TopCenter:
-            result.x += (parentSize.x - m_size.x) * 0.5f + m_position.x;
-            result.y += parentSize.y - m_position.y - m_size.y;
+            result.x += (parentRect.width - m_size.x) * 0.5f + m_position.x;
+            result.y += parentRect.height - m_position.y - m_size.y;
             break;
         case Anchor::TopRight:
-            result.x += parentSize.x - m_position.x - m_size.x;
-            result.y += parentSize.y - m_position.y - m_size.y;
+            result.x += parentRect.width - m_position.x - m_size.x;
+            result.y += parentRect.height - m_position.y - m_size.y;
             break;
         case Anchor::CenterLeft:
             result.x += m_position.x;
-            result.y += (parentSize.y - m_size.y) * 0.5f + m_position.y;
+            result.y += (parentRect.height - m_size.y) * 0.5f + m_position.y;
             break;
         case Anchor::Center:
-            result.x += (parentSize.x - m_size.x) * 0.5f;
-            result.y += (parentSize.y - m_size.y) * 0.5f;
+            result.x += (parentRect.width - m_size.x) * 0.5f + m_position.x;
+            result.y += (parentRect.height - m_size.y) * 0.5f + m_position.y;
             break;
         case Anchor::CenterRight:
-            result.x += parentSize.x - m_position.x - m_size.x;
-            result.y += (parentSize.y - m_size.y) * 0.5f + m_position.y;
+            result.x += parentRect.width - m_position.x - m_size.x;
+            result.y += (parentRect.height - m_size.y) * 0.5f + m_position.y;
             break;
         case Anchor::BottomLeft:
             result.x += m_position.x;
             result.y += m_position.y;
             break;
         case Anchor::BottomCenter:
-            result.x += (parentSize.x - m_size.x) * 0.5f + m_position.x;
+            result.x += (parentRect.width - m_size.x) * 0.5f + m_position.x;
             result.y += m_position.y;
             break;
         case Anchor::BottomRight:
-            result.x += parentSize.x - m_position.x - m_size.x;
+            result.x += parentRect.width - m_position.x - m_size.x;
             result.y += m_position.y;
             break;
         }
-
         return result;
     }
 
+    Rect Frame::getAbsoluteRect() const {
+        const Position position = getAbsolutePosition();
+        return { position.x, position.y, m_size.x, m_size.y };
+    }
+
     Frame& Frame::createChildFrame(const std::string& name) {
+        if (findChildFrame(name)) {
+            throw std::invalid_argument("A child frame named '" + name + "' already exists in frame '" + m_name + "'");
+        }
+
         auto child = std::make_unique<Frame>(name, this);
         Frame& reference = *child;
         m_children.emplace_back(std::move(child));
         return reference;
     }
 
-    bool Frame::removeChildFrame(const std::string& name) {
-        auto it = std::find_if(m_children.begin(), m_children.end(), [&](const std::unique_ptr<Frame>& frame) {
+    Frame* Frame::findChildFrame(const std::string& name) {
+        const auto iterator = std::find_if(m_children.begin(), m_children.end(), [&](const auto& frame) {
             return frame && frame->getName() == name;
         });
+        return iterator != m_children.end() ? iterator->get() : nullptr;
+    }
 
-        if (it == m_children.end() || !(*it)->canBeDeleted()) {
+    const Frame* Frame::findChildFrame(const std::string& name) const {
+        const auto iterator = std::find_if(m_children.begin(), m_children.end(), [&](const auto& frame) {
+            return frame && frame->getName() == name;
+        });
+        return iterator != m_children.end() ? iterator->get() : nullptr;
+    }
+
+    bool Frame::removeChildFrame(const std::string& name) {
+        const auto iterator = std::find_if(m_children.begin(), m_children.end(), [&](const auto& frame) {
+            return frame && frame->getName() == name;
+        });
+        if (iterator == m_children.end() || !(*iterator)->canBeDeleted()) {
             return false;
         }
-
-        m_children.erase(it);
+        m_children.erase(iterator);
         return true;
     }
 
-    void Frame::render(TextRenderer& textRenderer, ShapeRenderer& shapeRenderer) {
+    void Frame::render(TextRenderer& textRenderer, ShapeRenderer& shapeRenderer, const Input& input) {
+        const Rect rootClip = getAbsoluteRect();
+        renderInternal(textRenderer, shapeRenderer, input, rootClip, true);
+    }
+
+    void Frame::renderInternal(
+        TextRenderer& textRenderer,
+        ShapeRenderer& shapeRenderer,
+        const Input& input,
+        const Rect& parentClip,
+        bool isRoot) {
+
         if (!m_visible) {
             clearTextBatchesRecursive();
             return;
         }
 
-        const Position basePosition = getAbsolutePosition();
-        if (m_showBackground && m_size.x > 0.0f && m_size.y > 0.0f) {
-            shapeRenderer.drawFilledRect(basePosition.x, basePosition.y, m_size.x, m_size.y, m_backgroundColor);
+        const Rect frameRect = getAbsoluteRect();
+        const Rect activeClip = m_clipContents ? intersect(parentClip, frameRect) : parentClip;
+        if (activeClip.width <= 0.0f || activeClip.height <= 0.0f) {
+            clearTextBatchesRecursive();
+            return;
+        }
+
+        shapeRenderer.flush();
+        textRenderer.flush();
+        applyScissor(activeClip);
+
+        if (m_showBackground && frameRect.width > 0.0f && frameRect.height > 0.0f) {
+            shapeRenderer.drawFilledRect(frameRect.x, frameRect.y, frameRect.width, frameRect.height, m_backgroundColor);
         }
 
         for (const auto& widget : m_widgets) {
             if (widget && widget->isVisible()) {
-                widget->render(*this, textRenderer, shapeRenderer);
+                widget->render(*this, textRenderer, shapeRenderer, input);
             }
         }
 
         for (const auto& command : m_textBatch.getCommands()) {
-            float size = command.sizePixels;
-            if (size <= 0.0f) {
-                size = textRenderer.getBasePixelHeight();
-            }
-
+            const float size = command.sizePixels > 0.0f ? command.sizePixels : textRenderer.getBasePixelHeight();
             textRenderer.renderText(
                 command.text,
-                basePosition.x + command.position.x,
-                basePosition.y + command.position.y,
+                frameRect.x + command.position.x,
+                frameRect.y + command.position.y,
                 size,
                 command.color);
         }
-
         m_textBatch.clear();
+
+        if (m_showBorder && frameRect.width > 0.0f && frameRect.height > 0.0f && m_borderThickness > 0.0f) {
+            shapeRenderer.drawRectOutline(
+                frameRect.x,
+                frameRect.y,
+                frameRect.width,
+                frameRect.height,
+                m_borderThickness,
+                m_borderColor);
+        }
+
+        // Shape geometry must land before glyphs at each retained UI layer.
+        shapeRenderer.flush();
+        textRenderer.flush();
 
         for (auto& child : m_children) {
             if (child) {
-                child->render(textRenderer, shapeRenderer);
+                child->renderInternal(textRenderer, shapeRenderer, input, activeClip, false);
             }
         }
 
-        if (m_showBorder && m_size.x > 0.0f && m_size.y > 0.0f) {
-            shapeRenderer.drawRectOutline(basePosition.x, basePosition.y, m_size.x, m_size.y, 2.0f, Colors::Black);
+        shapeRenderer.flush();
+        textRenderer.flush();
+        if (isRoot) {
+            glDisable(GL_SCISSOR_TEST);
+        } else {
+            applyScissor(parentClip);
         }
     }
 
@@ -156,30 +224,8 @@ namespace WidgeCraft {
         }
     }
 
-    Frame* Frame::getRoot() {
-        Frame* current = this;
-        while (current && current->m_parent) {
-            current = current->m_parent;
-        }
-        return current;
-    }
-
-    const Frame* Frame::getRoot() const {
-        const Frame* current = this;
-        while (current && current->m_parent) {
-            current = current->m_parent;
-        }
-        return current;
-    }
-
-    void Frame::TextBatch::addText(std::string text, float x, float y, float sizePixels, TextRenderer::Color color) {
-        Command command;
-        command.text = std::move(text);
-        command.position.x = x;
-        command.position.y = y;
-        command.sizePixels = sizePixels;
-        command.color = color;
-        m_commands.emplace_back(std::move(command));
+    void Frame::TextBatch::addText(std::string text, float x, float y, float sizePixels, Color color) {
+        m_commands.push_back({ std::move(text), { x, y }, sizePixels, color });
     }
 
     void Frame::TextBatch::clear() {
