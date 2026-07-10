@@ -1,10 +1,12 @@
 #pragma once
 
+#include "WidgeCraft/Input.hpp"
 #include "WidgeCraft/TextRenderer.hpp"
 #include "WidgeCraft/Types.hpp"
 #include "WidgeCraft/Widget.hpp"
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -21,12 +23,11 @@ namespace WidgeCraft {
                 std::string text;
                 Position position;
                 float sizePixels = 0.0f;
-                TextRenderer::Color color{ 1.0f, 1.0f, 1.0f };
+                Color color{ Colors::White };
             };
 
-            void addText(std::string text, float x, float y, float sizePixels, TextRenderer::Color color);
+            void addText(std::string text, float x, float y, float sizePixels, Color color = Colors::White);
             void clear();
-
             const std::vector<Command>& getCommands() const { return m_commands; }
 
         private:
@@ -48,12 +49,17 @@ namespace WidgeCraft {
 
         void setBackgroundVisible(bool visible) { m_showBackground = visible; }
         bool isBackgroundVisible() const { return m_showBackground; }
-
         void setBorderVisible(bool visible) { m_showBorder = visible; }
         bool isBorderVisible() const { return m_showBorder; }
+        void setClipContents(bool clipContents) { m_clipContents = clipContents; }
+        bool clipsContents() const { return m_clipContents; }
 
         void setBackgroundColor(Color color) { m_backgroundColor = color; }
         Color getBackgroundColor() const { return m_backgroundColor; }
+        void setBorderColor(Color color) { m_borderColor = color; }
+        Color getBorderColor() const { return m_borderColor; }
+        void setBorderThickness(float thickness) { m_borderThickness = thickness; }
+        float getBorderThickness() const { return m_borderThickness; }
 
         void setPosition(float x, float y);
         void setPosition(const Position& position) { setPosition(position.x, position.y); }
@@ -67,12 +73,19 @@ namespace WidgeCraft {
         Anchor getAnchor() const { return m_anchor; }
 
         Position getAbsolutePosition() const;
+        Rect getAbsoluteRect() const;
 
         Frame& createChildFrame(const std::string& name);
+        Frame* findChildFrame(const std::string& name);
+        const Frame* findChildFrame(const std::string& name) const;
         bool removeChildFrame(const std::string& name);
 
         template <typename T, typename... Args>
         T& addWidget(Args&&... args);
+
+        Widget* findWidget(const std::string& name) { return m_widgets.find(name); }
+        const Widget* findWidget(const std::string& name) const { return m_widgets.find(name); }
+        bool removeWidget(const std::string& name) { return m_widgets.remove(name); }
 
         TextBatch& getTextBatch() { return m_textBatch; }
         const TextBatch& getTextBatch() const { return m_textBatch; }
@@ -85,23 +98,30 @@ namespace WidgeCraft {
         void setDeletable(bool deletable) { m_deletable = deletable; }
         bool canBeDeleted() const { return m_deletable; }
 
-        void render(TextRenderer& textRenderer, ShapeRenderer& shapeRenderer);
+        void render(TextRenderer& textRenderer, ShapeRenderer& shapeRenderer, const Input& input);
 
     private:
+        void renderInternal(
+            TextRenderer& textRenderer,
+            ShapeRenderer& shapeRenderer,
+            const Input& input,
+            const Rect& parentClip,
+            bool isRoot);
         void clearTextBatchesRecursive();
-        Frame* getRoot();
-        const Frame* getRoot() const;
 
         std::string m_name;
         Frame* m_parent = nullptr;
         bool m_visible = true;
         bool m_showBackground = true;
         bool m_showBorder = false;
+        bool m_clipContents = true;
         bool m_deletable = true;
         Color m_backgroundColor{ Colors::Grey };
-        Position m_position{ 10.0f, 10.0f };
+        Color m_borderColor{ Colors::Black };
+        float m_borderThickness = 1.0f;
+        Position m_position{ 0.0f, 0.0f };
         Size m_size{};
-        Anchor m_anchor = Anchor::Center;
+        Anchor m_anchor = Anchor::BottomLeft;
         TextBatch m_textBatch;
         Widgets m_widgets;
         std::vector<std::unique_ptr<Frame>> m_children;
