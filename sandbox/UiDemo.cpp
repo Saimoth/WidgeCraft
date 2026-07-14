@@ -6,11 +6,18 @@
 
 int main() {
     try {
+        constexpr float sceneWidth = 1100.0f;
+        constexpr float sceneHeight = 720.0f;
+
         WidgeCraft::WidgeCraft app(
             "WidgeCraft UI Sandbox",
-            1100,
-            720);
+            static_cast<int>(sceneWidth),
+            static_cast<int>(sceneHeight));
         app.setClearColor({ 0.030f, 0.040f, 0.060f, 1.0f });
+
+        WidgeCraft::SceneViewport2D sceneViewport(
+            sceneWidth,
+            sceneHeight);
 
         auto& root = app.getRootFrame();
         root.setBackgroundVisible(false);
@@ -34,7 +41,7 @@ int main() {
 
         auto& subtitle = panel.addWidget<WidgeCraft::Label>(
             "Subtitle",
-            "Frames, widgets, Shapes2D and SDF text");
+            "Frames, widgets and a fixed-aspect 2D scene");
         subtitle.setAnchor(WidgeCraft::Anchor::TopLeft);
         subtitle.setPosition(24.0f, 62.0f);
         subtitle.setTextSize(16.0f);
@@ -51,7 +58,7 @@ int main() {
 
         auto& status = statusCard.addWidget<WidgeCraft::Label>(
             "Status",
-            "The UI is ready.");
+            "Resize the window: scene shapes keep their proportions.");
         status.setAnchor(WidgeCraft::Anchor::CenterLeft);
         status.setPosition(18.0f, 0.0f);
         status.setSize(430.0f, 34.0f);
@@ -114,13 +121,18 @@ int main() {
             const float height = static_cast<float>(
                 engine.getWindow().getHeight());
 
+            sceneViewport.resize(width, height);
+            shapes.setTransform(
+                sceneViewport.getOffset(),
+                sceneViewport.getScale());
+
             WidgeCraft::ShapeStyle2D circleStyle;
             circleStyle.fillColor = { 0.06f, 0.20f, 0.30f, 0.75f };
             circleStyle.edgeColor = { 0.25f, 0.68f, 0.92f, 0.9f };
             circleStyle.edgeThickness = 3.0f;
             circleStyle.edgeVisible = true;
             shapes.drawCircle(
-                { width * 0.18f, height * 0.74f },
+                { sceneWidth * 0.18f, sceneHeight * 0.74f },
                 92.0f,
                 circleStyle);
 
@@ -130,7 +142,12 @@ int main() {
             rectangleStyle.edgeThickness = 4.0f;
             rectangleStyle.edgeVisible = true;
             shapes.drawRect(
-                { width * 0.74f, height * 0.18f, 170.0f, 116.0f },
+                {
+                    sceneWidth * 0.74f,
+                    sceneHeight * 0.18f,
+                    170.0f,
+                    116.0f
+                },
                 rectangleStyle);
 
             WidgeCraft::ShapeStyle2D triangleStyle;
@@ -139,9 +156,9 @@ int main() {
             triangleStyle.edgeThickness = 4.0f;
             triangleStyle.edgeVisible = true;
             shapes.drawTriangle(
-                { width * 0.79f, height * 0.78f },
-                { width * 0.90f, height * 0.58f },
-                { width * 0.68f, height * 0.58f },
+                { sceneWidth * 0.79f, sceneHeight * 0.78f },
+                { sceneWidth * 0.90f, sceneHeight * 0.58f },
+                { sceneWidth * 0.68f, sceneHeight * 0.58f },
                 triangleStyle);
         });
 
