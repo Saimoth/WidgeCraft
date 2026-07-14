@@ -31,6 +31,14 @@ namespace WidgeCraft {
         void beginFrame();
         void flush();
 
+        // Applies a uniform logical-scene transform while geometry is queued.
+        // Vertex positions, dimensions and edge thicknesses all receive the
+        // same scale, preserving shape aspect ratios.
+        void setTransform(const Vec2& offset, float uniformScale);
+        void resetTransform();
+        Vec2 getTransformOffset() const { return m_transformOffset; }
+        float getTransformScale() const { return m_transformScale; }
+
         void reserve(std::size_t triangleCount);
 
         void drawPoint(float x, float y, float size, const Color& color);
@@ -121,6 +129,8 @@ namespace WidgeCraft {
         int m_uniformScreenSize = -1;
         float m_screenWidth = 0.0f;
         float m_screenHeight = 0.0f;
+        Vec2 m_transformOffset{};
+        float m_transformScale = 1.0f;
         std::vector<Vertex> m_vertices;
     };
 
