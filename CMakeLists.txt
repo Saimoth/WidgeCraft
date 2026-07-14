@@ -49,6 +49,7 @@ set(WIDGECRAFT_ENGINE_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/ui/Frame.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/ui/Widget.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Scene.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/SceneViewport2D.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Raycast.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/render/ShaderProgram.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/primitives/Types.hpp
