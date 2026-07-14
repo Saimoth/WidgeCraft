@@ -1,4 +1,4 @@
-#include "WidgeCraft/ShapeRenderer.hpp"
+#include "WidgeCraft/primitives/Shapes2D.hpp"
 
 #include <glad/glad.h>
 
@@ -136,8 +136,22 @@ namespace WidgeCraft {
         m_screenHeight = height;
     }
 
+    void ShapeRenderer::setTransform(
+        const Vec2& offset,
+        float uniformScale) {
+
+        m_transformOffset = offset;
+        m_transformScale = std::max(uniformScale, 0.0f);
+    }
+
+    void ShapeRenderer::resetTransform() {
+        m_transformOffset = {};
+        m_transformScale = 1.0f;
+    }
+
     void ShapeRenderer::beginFrame() {
         m_vertices.clear();
+        resetTransform();
     }
 
     void ShapeRenderer::flush() {
@@ -269,7 +283,16 @@ namespace WidgeCraft {
     }
 
     void ShapeRenderer::addVertex(const Vec2& position, const Color& color) {
-        m_vertices.push_back({ position.x, position.y, color.r, color.g, color.b, color.a });
+        const Vec2 transformed =
+            m_transformOffset + position * m_transformScale;
+        m_vertices.push_back({
+            transformed.x,
+            transformed.y,
+            color.r,
+            color.g,
+            color.b,
+            color.a
+        });
     }
 
     void ShapeRenderer::moveFrom(ShapeRenderer&& other) noexcept {
@@ -279,6 +302,8 @@ namespace WidgeCraft {
         m_uniformScreenSize = other.m_uniformScreenSize;
         m_screenWidth = other.m_screenWidth;
         m_screenHeight = other.m_screenHeight;
+        m_transformOffset = other.m_transformOffset;
+        m_transformScale = other.m_transformScale;
         m_vertices = std::move(other.m_vertices);
 
         other.m_vao = 0;
@@ -287,6 +312,7 @@ namespace WidgeCraft {
         other.m_uniformScreenSize = -1;
         other.m_screenWidth = 0.0f;
         other.m_screenHeight = 0.0f;
+        other.resetTransform();
     }
 
     void ShapeRenderer::cleanup() {
