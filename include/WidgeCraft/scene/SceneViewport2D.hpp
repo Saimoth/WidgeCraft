@@ -58,7 +58,8 @@ namespace WidgeCraft {
         }
 
         Rect toScreen(const Rect& sceneRect) const {
-            const Vec2 bottomLeft = toScreen({ sceneRect.x, sceneRect.y });
+            const Vec2 bottomLeft = toScreen(
+                Vec2{ sceneRect.x, sceneRect.y });
             return {
                 bottomLeft.x,
                 bottomLeft.y,
