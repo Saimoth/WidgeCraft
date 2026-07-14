@@ -6,6 +6,9 @@
 #include "WidgeCraft/primitives/TextRenderer.hpp"
 #include "WidgeCraft/primitives/Types.hpp"
 #include "WidgeCraft/render/ShaderProgram.hpp"
+#include "WidgeCraft/scene/Camera2D.hpp"
+#include "WidgeCraft/scene/Camera3D.hpp"
+#include "WidgeCraft/scene/ModelViewport.hpp"
 #include "WidgeCraft/scene/Raycast.hpp"
 #include "WidgeCraft/scene/Scene.hpp"
 #include "WidgeCraft/scene/SceneViewport2D.hpp"
@@ -54,6 +57,17 @@ namespace WidgeCraft {
         Scene* getScene() { return m_scene.get(); }
         const Scene* getScene() const { return m_scene.get(); }
 
+        // Selects one clipped model area for the current render frame.
+        // Geometry queued after this call uses the viewport's 2D and 3D cameras.
+        void useModelViewport(const ModelViewport& viewport);
+        void clearModelViewport();
+        bool hasActiveModelViewport() const {
+            return m_modelViewportActive;
+        }
+        Rect getActiveModelViewportRect() const {
+            return m_modelViewportRect;
+        }
+
         void setClearColor(Color color) { m_clearColor = color; }
         Color getClearColor() const { return m_clearColor; }
 
@@ -93,6 +107,8 @@ namespace WidgeCraft {
         UpdateCallback m_updateCallback;
         RenderCallback m_renderCallback;
         std::unique_ptr<Scene> m_scene;
+        Rect m_modelViewportRect{};
+        bool m_modelViewportActive = false;
         float m_deltaTime = 0.0f;
         double m_elapsedTime = 0.0;
         int m_targetFrameRate = 60;

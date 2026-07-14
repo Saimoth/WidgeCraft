@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(WidgeCraft VERSION 0.3.0 LANGUAGES CXX)
+project(WidgeCraft VERSION 0.4.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -49,6 +49,9 @@ set(WIDGECRAFT_ENGINE_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/ui/Frame.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/ui/Widget.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Scene.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Camera2D.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Camera3D.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/ModelViewport.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/SceneViewport2D.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Raycast.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/render/ShaderProgram.hpp
