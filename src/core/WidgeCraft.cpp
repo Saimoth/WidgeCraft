@@ -5,6 +5,7 @@
 
 #include <algorithm>
 #include <chrono>
+#include <cmath>
 #include <filesystem>
 #include <thread>
 #include <utility>
@@ -24,6 +25,21 @@ namespace WidgeCraft {
                 std::filesystem::current_path()
                 / "assets/fonts/Roboto-Regular.ttf";
             return localPath.string();
+        }
+
+        Rect clipToFramebuffer(
+            const Rect& rect,
+            int framebufferWidth,
+            int framebufferHeight) {
+
+            return intersect(
+                rect,
+                Rect{
+                    0.0f,
+                    0.0f,
+                    static_cast<float>(std::max(framebufferWidth, 0)),
+                    static_cast<float>(std::max(framebufferHeight, 0))
+                });
         }
     } // namespace
 
@@ -95,6 +111,28 @@ namespace WidgeCraft {
         }
     }
 
+    void WidgeCraft::useModelViewport(
+        const ModelViewport& viewport) {
+
+        m_modelViewportRect = viewport.getScreenRect();
+        m_modelViewportActive =
+            m_modelViewportRect.width > 0.0f
+            && m_modelViewportRect.height > 0.0f;
+
+        if (!m_modelViewportActive) {
+            m_shapes2D.resetTransform();
+            return;
+        }
+
+        viewport.configureRenderers(m_shapes2D, m_shapes3D);
+    }
+
+    void WidgeCraft::clearModelViewport() {
+        m_modelViewportActive = false;
+        m_modelViewportRect = {};
+        m_shapes2D.resetTransform();
+    }
+
     void WidgeCraft::Update() {
         m_textRenderer.setScreenSize(
             m_window.getWidth(),
@@ -112,6 +150,11 @@ namespace WidgeCraft {
     }
 
     void WidgeCraft::Render() {
+        const int framebufferWidth = m_window.getWidth();
+        const int framebufferHeight = m_window.getHeight();
+
+        glViewport(0, 0, framebufferWidth, framebufferHeight);
+        glDisable(GL_SCISSOR_TEST);
         glClearColor(
             m_clearColor.r,
             m_clearColor.g,
@@ -122,6 +165,8 @@ namespace WidgeCraft {
         m_shapes3D.beginFrame();
         m_shapes2D.beginFrame();
         m_textRenderer.beginFrame();
+        m_modelViewportActive = false;
+        m_modelViewportRect = {};
 
         if (m_scene) {
             m_scene->onRender(*this);
@@ -130,13 +175,44 @@ namespace WidgeCraft {
             m_renderCallback(*this);
         }
 
-        // World geometry first, then the transformed 2D scene.
-        m_shapes3D.flush();
-        m_shapes2D.flush();
-        m_textRenderer.flush();
+        if (m_modelViewportActive) {
+            const Rect clipped = clipToFramebuffer(
+                m_modelViewportRect,
+                framebufferWidth,
+                framebufferHeight);
 
-        // Retained UI always uses native client pixels, regardless of any
-        // logical scene transform used by the callback or Scene.
+            const int left = static_cast<int>(std::floor(clipped.x));
+            const int bottom = static_cast<int>(std::floor(clipped.y));
+            const int right = static_cast<int>(std::ceil(clipped.right()));
+            const int top = static_cast<int>(std::ceil(clipped.top()));
+            const int clipWidth = std::max(0, right - left);
+            const int clipHeight = std::max(0, top - bottom);
+
+            glEnable(GL_SCISSOR_TEST);
+            glScissor(left, bottom, clipWidth, clipHeight);
+
+            // 3D uses the model rectangle as its OpenGL viewport. The camera
+            // projection was built from the same aspect ratio.
+            glViewport(left, bottom, clipWidth, clipHeight);
+            m_shapes3D.flush();
+
+            // 2D shapes and text are already transformed into full-framebuffer
+            // coordinates, so only scissoring remains active for these passes.
+            glViewport(0, 0, framebufferWidth, framebufferHeight);
+            m_shapes2D.flush();
+            m_textRenderer.flush();
+
+            glDisable(GL_SCISSOR_TEST);
+        } else {
+            m_shapes3D.flush();
+            m_shapes2D.flush();
+            m_textRenderer.flush();
+        }
+
+        // Retained UI always renders in native framebuffer pixels. Scene
+        // transforms, clipping and the 3D viewport cannot stretch or crop it.
+        glViewport(0, 0, framebufferWidth, framebufferHeight);
+        glDisable(GL_SCISSOR_TEST);
         m_shapes2D.resetTransform();
         m_window.getRootFrame().render(
             m_textRenderer,
