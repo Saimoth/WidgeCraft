@@ -8,6 +8,7 @@
 #include "WidgeCraft/render/ShaderProgram.hpp"
 #include "WidgeCraft/scene/Raycast.hpp"
 #include "WidgeCraft/scene/Scene.hpp"
+#include "WidgeCraft/scene/SceneViewport2D.hpp"
 #include "WidgeCraft/ui/Frame.hpp"
 #include "WidgeCraft/ui/Widget.hpp"
 #include "WidgeCraft/window/Window.hpp"

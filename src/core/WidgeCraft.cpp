@@ -130,11 +130,14 @@ namespace WidgeCraft {
             m_renderCallback(*this);
         }
 
-        // World geometry first, then the pixel-space scene and retained UI.
+        // World geometry first, then the transformed 2D scene.
         m_shapes3D.flush();
         m_shapes2D.flush();
         m_textRenderer.flush();
 
+        // Retained UI always uses native client pixels, regardless of any
+        // logical scene transform used by the callback or Scene.
+        m_shapes2D.resetTransform();
         m_window.getRootFrame().render(
             m_textRenderer,
             m_shapes2D,

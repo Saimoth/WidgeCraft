@@ -9,7 +9,7 @@ include/WidgeCraft/
   input/        Keyboard, mouse and pointer state
   window/       Window, framebuffer and client-area ownership
   ui/           Frames and retained UI widgets
-  scene/        Scene lifecycle and world queries such as raycasting
+  scene/        Scene lifecycle, 2D viewports and world queries
   render/       Shader-program and rendering-pipeline utilities
   primitives/   Maths/types, Shapes2D, Shapes3D and SDF text
 
@@ -30,6 +30,21 @@ Compatibility headers remain at `include/WidgeCraft/*.hpp`, but new code should 
 ## Primitive drawing
 
 `Shapes2D` supports points, thick lines, triangles, rectangles and circles. The `ShapeStyle2D` helpers combine fill colour, edge colour and edge thickness in one call.
+
+A `SceneViewport2D` maps a fixed logical canvas into the current client area with one uniform scale. This keeps all 2D scene geometry, dimensions and edge thicknesses proportional when the window aspect ratio changes:
+
+```cpp
+WidgeCraft::SceneViewport2D viewport(1100.0f, 720.0f);
+
+viewport.resize(windowWidth, windowHeight);
+auto& shapes = app.getShapes2D();
+shapes.setTransform(viewport.getOffset(), viewport.getScale());
+
+// Draw in the fixed 1100 x 720 logical scene.
+shapes.drawCircle({ 200.0f, 500.0f }, 90.0f, style);
+```
+
+The retained UI automatically returns to native client-pixel coordinates after scene drawing.
 
 `Shapes3D` supports lines, triangles, quads, boxes and cubes. Set its view-projection matrix before queuing 3D geometry:
 
