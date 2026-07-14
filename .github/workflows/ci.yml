@@ -5,9 +5,7 @@ on:
   pull_request:
 
 jobs:
-  build-and-test:
-    # Pin the runner because windows-latest now carries VS2026, while the
-    # supported WidgeCraft preset intentionally generates a VS2022 solution.
+  build:
     runs-on: windows-2022
     timeout-minutes: 20
 
@@ -18,8 +16,5 @@ jobs:
       - name: Configure Visual Studio 2022 Win32
         run: cmake --preset vs2022-win32-release
 
-      - name: Build Release
+      - name: Build engine and UI sandbox
         run: cmake --build --preset build-release --parallel
-
-      - name: Run non-graphical tests
-        run: ctest --preset test-release

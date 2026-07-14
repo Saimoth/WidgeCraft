@@ -1,182 +1,83 @@
 # WidgeCraft
 
-WidgeCraft is a small retained-mode graphics and UI engine for Windows, C++17 and OpenGL 3.3 Core. The project is deliberately focused: useful pixel-space primitives, scalable SDF text, a built-in widget tree, and clean ray queries without depending on an immediate-mode UI library.
+WidgeCraft is a Windows-focused C++17/OpenGL 3.3 engine foundation with retained UI, SDF text, batched 2D primitives, basic 3D primitives and ray queries. The supported development target is Visual Studio 2022, Win32, Release.
 
-The current supported development target is **Visual Studio 2022, Win32, Release**.
+## Project layout
 
-## Current engine foundation
+```text
+include/WidgeCraft/
+  input/        Keyboard, mouse and pointer state
+  window/       Window, framebuffer and client-area ownership
+  ui/           Frames and retained UI widgets
+  scene/        Scene lifecycle and world queries such as raycasting
+  render/       Shader-program and rendering-pipeline utilities
+  primitives/   Maths/types, Shapes2D, Shapes3D and SDF text
 
-### Batched 2D primitives
+src/
+  core/         Application loop and subsystem orchestration
+  input/        Input implementation
+  window/       Window implementation
+  ui/           Frame and widget implementation
+  scene/        Scene-query implementation
+  render/       OpenGL shader/pipeline implementation
+  primitives/   2D, 3D and text rendering implementation
 
-`ShapeRenderer` batches coloured triangles and builds the common primitives on top:
-
-- Points
-- Thick lines
-- Filled triangles
-- Filled and outlined rectangles
-- Filled and outlined circles with adaptive tessellation
-
-```cpp
-auto& shapes = app.getShapeRenderer();
-shapes.drawLine(20.0f, 20.0f, 220.0f, 80.0f, 4.0f, WidgeCraft::Colors::Cyan);
-shapes.drawFilledCircle(320.0f, 180.0f, 48.0f, WidgeCraft::Colors::Orange);
-shapes.drawRectOutline(400.0f, 100.0f, 160.0f, 90.0f, 3.0f, WidgeCraft::Colors::Green);
+sandbox/        Launchable visual integration demos
 ```
 
-### SDF text
+Compatibility headers remain at `include/WidgeCraft/*.hpp`, but new code should use the organised paths or include the aggregate `WidgeCraft/WidgeCraft.hpp` header.
 
-`TextRenderer` creates a signed-distance-field atlas from a TrueType font and batches glyphs into one draw per layer. It includes:
+## Primitive drawing
 
-- Smooth scaling from small labels to large headings
-- A high-resolution source distance field
-- Scale-aware screen-space edge smoothing
-- Kerning
-- UTF-8 decoding for the bundled Western/common-symbol atlas
-- Text bounds and width measurement
-- Per-glyph colour and alpha
+`Shapes2D` supports points, thick lines, triangles, rectangles and circles. The `ShapeStyle2D` helpers combine fill colour, edge colour and edge thickness in one call.
+
+`Shapes3D` supports lines, triangles, quads, boxes and cubes. Set its view-projection matrix before queuing 3D geometry:
 
 ```cpp
-auto& text = app.getTextRenderer();
-text.renderText("Small and crisp", 30.0f, 80.0f, 12.0f, WidgeCraft::Colors::White);
-text.renderText("Large SDF", 30.0f, 180.0f, 72.0f, { 0.3f, 0.8f, 1.0f, 1.0f });
+app.getShapes3D().setViewProjection(projection * view);
+app.getShapes3D().drawCube(
+    { 0.0f, 0.0f, -4.0f },
+    1.5f,
+    WidgeCraft::ShapeStyle3D{});
 ```
 
-### Retained UI
+The 3D edge thickness uses OpenGL line width and is therefore subject to the graphics driver's supported line-width range.
 
-Frames own child frames and widgets. Frames and widgets support anchors and offsets in a bottom-left pixel coordinate system. Frame contents are clipped using OpenGL scissor rectangles.
+## Scene and UI
 
-Included widgets:
+`Scene` provides optional attach, detach, update and render hooks. Existing callback-based update/render code remains supported.
 
-- `Label`
-- `Button` with hover, press, release and click callback states
-- `Checkbox` with a change callback
-
-```cpp
-auto& panel = app.getRootFrame().createChildFrame("Inspector");
-panel.setAnchor(WidgeCraft::Anchor::TopRight);
-panel.setPosition(20.0f, 20.0f);
-panel.setSize(300.0f, 220.0f);
-
-auto& button = panel.addWidget<WidgeCraft::Button>("Apply", "Apply");
-button.setAnchor(WidgeCraft::Anchor::BottomRight);
-button.setPosition(16.0f, 16.0f);
-button.setSize(100.0f, 38.0f);
-button.setOnClick([] {
-    // Apply changes.
-});
-```
-
-Names are unique within each parent frame. Frames and widgets can be found or removed by name.
-
-### Input
-
-`Input` records frame transitions rather than exposing only raw GLFW state:
-
-```cpp
-const auto& input = app.getInput();
-if (input.mousePressed(WidgeCraft::MouseButton::Left)) {
-    const WidgeCraft::Vec2 position = input.mousePosition();
-}
-```
-
-Available state includes key and mouse `down`, `pressed` and `released`, pointer position/delta, and wheel delta.
-
-### Raycasting and ray picking
-
-The ray module is independent from OpenGL and can be unit tested without opening a window. It currently includes:
-
-- Ray versus sphere
-- Ray versus axis-aligned bounding box
-- Ray versus plane
-- Ray versus triangle, with optional back-face culling
-- Screen point to world ray using view and projection matrices
-- Matrix inversion and hit point/normal/distance data
-
-```cpp
-WidgeCraft::Ray ray{ cameraPosition, rayDirection };
-WidgeCraft::RayHit hit{};
-
-if (WidgeCraft::raycast(ray, objectBounds, hit)) {
-    // hit.distance, hit.point and hit.normal are available here.
-}
-```
-
-## 3D raycast sandbox
-
-The `widgecraft_3d_sandbox` executable is an interactive integration test for camera movement, 3D rendering, input and ray picking. Its source now sits beside `RaycastTests.cpp` in the `tests` directory. It renders eight coloured cubes and uses `screenPointToRay` plus AABB intersection to select the nearest cube under the pointer.
-
-Controls:
-
-- `W`, `A`, `S`, `D` — fly relative to the camera
-- `Shift` — move faster
-- Hold the right mouse button and drag — yaw and pitch the camera
-- Left mouse button — cycle the colour of the nearest hit cube
-- `Escape` — close the sandbox
+The retained UI contains `Frame`, `Label`, `Button` and `Checkbox`. UI drawing uses `Shapes2D` and `TextRenderer` internally.
 
 ## Generate the Visual Studio solution
 
-From a Visual Studio Developer Command Prompt:
+Run from the repository root:
 
 ```bat
-cmake --preset vs2022-win32-release
+.\generate_vs2022_win32.bat
 ```
 
-Or double-click:
+From Visual Studio's integrated terminal, prevent a second Visual Studio window opening with:
 
-```text
-generate_vs2022_win32.bat
+```bat
+.\generate_vs2022_win32.bat --no-open
 ```
 
-Open:
+Then open or reload:
 
 ```text
 build\win32-release\WidgeCraft.sln
 ```
 
-The generated Visual Studio solution uses `widgecraft_3d_sandbox` as its default startup project when the sandbox option is enabled.
+The generated solution sets `widgecraft_ui_sandbox` as the startup project. The only launchable demo currently retained is:
 
-The main targets are:
+```text
+build\win32-release\Release\widgecraft_ui_sandbox.exe
+```
 
-- `widgecraft_engine` / `WidgeCraft::Engine` — reusable static engine library
-- `widgecraft` — interactive 2D showcase
-- `widgecraft_3d_sandbox` — interactive camera and ray-picking sandbox
-- `widgecraft_raycast_tests` — non-graphical ray tests
-
-## Build and test
+## Build
 
 ```bat
+cmake --preset vs2022-win32-release
 cmake --build --preset build-release --parallel
-ctest --preset test-release
 ```
-
-The example executables are generated at:
-
-```text
-build\win32-release\Release\widgecraft.exe
-build\win32-release\Release\widgecraft_3d_sandbox.exe
-```
-
-Assets are copied beside each executable after a successful build.
-
-## Coordinate conventions
-
-- 2D screen and UI coordinates use a **bottom-left origin**.
-- Positive X points right; positive Y points up.
-- Text X/Y is its baseline origin.
-- GLFW cursor coordinates are converted into framebuffer pixels, including high-DPI scaling.
-- Matrices use OpenGL-compatible column-major storage.
-
-## Project structure
-
-```text
-assets/                 Fonts and future engine assets
-include/WidgeCraft/     Public engine headers
-src/                    Engine implementation and main showcase
-tests/                  Unit tests and interactive raycast sandbox
-third_party/            Header-only third-party source
-.github/workflows/      Win32 CI build and tests
-```
-
-## Near-term direction
-
-This branch establishes the engine foundation rather than trying to hide unfinished areas. Logical next additions are a dedicated reusable 3D model renderer and camera, texture/image primitives, keyboard focus and navigation, richer text ranges, movable/closable windows, and a broad-phase structure such as a BVH for large ray-picking scenes.

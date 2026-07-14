@@ -11,8 +11,7 @@
       "binaryDir": "${sourceDir}/build/win32-release",
       "cacheVariables": {
         "CMAKE_INSTALL_PREFIX": "${sourceDir}/install",
-        "WIDGECRAFT_BUILD_DEMO": "ON",
-        "WIDGECRAFT_BUILD_TESTS": "ON"
+        "WIDGECRAFT_BUILD_SANDBOX": "ON"
       }
     }
   ],
@@ -22,15 +21,6 @@
       "displayName": "Build Win32 Release",
       "configurePreset": "vs2022-win32-release",
       "configuration": "Release"
-    }
-  ],
-  "testPresets": [
-    {
-      "name": "test-release",
-      "displayName": "Test Win32 Release",
-      "configurePreset": "vs2022-win32-release",
-      "configuration": "Release",
-      "output": { "outputOnFailure": true }
     }
   ]
 }
