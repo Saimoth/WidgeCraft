@@ -28,8 +28,8 @@ shapes.drawRectOutline(400.0f, 100.0f, 160.0f, 90.0f, 3.0f, WidgeCraft::Colors::
 `TextRenderer` creates a signed-distance-field atlas from a TrueType font and batches glyphs into one draw per layer. It includes:
 
 - Smooth scaling from small labels to large headings
-- Mipmapped atlas sampling
-- Derivative-based edge smoothing
+- A high-resolution source distance field
+- Scale-aware screen-space edge smoothing
 - Kerning
 - UTF-8 decoding for the bundled Western/common-symbol atlas
 - Text bounds and width measurement
@@ -101,6 +101,18 @@ if (WidgeCraft::raycast(ray, objectBounds, hit)) {
 }
 ```
 
+## 3D raycast sandbox
+
+The `widgecraft_3d_sandbox` executable is an interactive integration test for camera movement, 3D rendering, input and ray picking. It renders eight coloured cubes and uses `screenPointToRay` plus AABB intersection to select the nearest cube under the pointer.
+
+Controls:
+
+- `W`, `A`, `S`, `D` — fly relative to the camera
+- `Shift` — move faster
+- Hold the right mouse button and drag — yaw and pitch the camera
+- Left mouse button — cycle the colour of the nearest hit cube
+- `Escape` — close the sandbox
+
 ## Generate the Visual Studio solution
 
 From a Visual Studio Developer Command Prompt:
@@ -124,7 +136,8 @@ build\win32-release\WidgeCraft.sln
 The main targets are:
 
 - `widgecraft_engine` / `WidgeCraft::Engine` — reusable static engine library
-- `widgecraft` — interactive showcase
+- `widgecraft` — interactive 2D showcase
+- `widgecraft_3d_sandbox` — interactive camera and ray-picking sandbox
 - `widgecraft_raycast_tests` — non-graphical ray tests
 
 ## Build and test
@@ -134,13 +147,14 @@ cmake --build --preset build-release --parallel
 ctest --preset test-release
 ```
 
-The showcase executable is generated at:
+The example executables are generated at:
 
 ```text
 build\win32-release\Release\widgecraft.exe
+build\win32-release\Release\widgecraft_3d_sandbox.exe
 ```
 
-Assets are copied beside the executable after a successful build.
+Assets are copied beside each executable after a successful build.
 
 ## Coordinate conventions
 
@@ -154,13 +168,14 @@ Assets are copied beside the executable after a successful build.
 
 ```text
 assets/                 Fonts and future engine assets
+examples/               Interactive integration sandboxes
 include/WidgeCraft/     Public engine headers
-src/                    Engine implementation and showcase
-third_party/            Header-only third-party source
+src/                    Engine implementation and main showcase
 tests/                  Non-graphical unit tests
+third_party/            Header-only third-party source
 .github/workflows/      Win32 CI build and tests
 ```
 
 ## Near-term direction
 
-This branch establishes the engine foundation rather than trying to hide unfinished areas. Logical next additions are a dedicated 3D model renderer and camera, texture/image primitives, keyboard focus and navigation, richer text ranges, movable/closable windows, and a broad-phase structure such as a BVH for large ray-picking scenes.
+This branch establishes the engine foundation rather than trying to hide unfinished areas. Logical next additions are a dedicated reusable 3D model renderer and camera, texture/image primitives, keyboard focus and navigation, richer text ranges, movable/closable windows, and a broad-phase structure such as a BVH for large ray-picking scenes.
