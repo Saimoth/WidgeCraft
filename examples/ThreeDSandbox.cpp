@@ -8,7 +8,10 @@
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <iomanip>
+#include <iostream>
 #include <limits>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -48,12 +51,15 @@ namespace {
 
         WidgeCraft::Mat4 result{};
         const float safeAspect = std::max(aspectRatio, 0.001f);
-        const float focalLength = 1.0f / std::tan(verticalFieldOfViewRadians * 0.5f);
+        const float focalLength = 1.0f
+            / std::tan(verticalFieldOfViewRadians * 0.5f);
 
         result(0, 0) = focalLength / safeAspect;
         result(1, 1) = focalLength;
-        result(2, 2) = (farPlane + nearPlane) / (nearPlane - farPlane);
-        result(2, 3) = (2.0f * farPlane * nearPlane) / (nearPlane - farPlane);
+        result(2, 2) = (farPlane + nearPlane)
+            / (nearPlane - farPlane);
+        result(2, 3) = (2.0f * farPlane * nearPlane)
+            / (nearPlane - farPlane);
         result(3, 2) = -1.0f;
         return result;
     }
@@ -66,7 +72,9 @@ namespace {
         const WidgeCraft::Vec3 viewForward = WidgeCraft::normalized(forward);
         const WidgeCraft::Vec3 viewRight = WidgeCraft::normalized(
             WidgeCraft::cross(viewForward, worldUp));
-        const WidgeCraft::Vec3 viewUp = WidgeCraft::cross(viewRight, viewForward);
+        const WidgeCraft::Vec3 viewUp = WidgeCraft::cross(
+            viewRight,
+            viewForward);
 
         WidgeCraft::Mat4 result = WidgeCraft::Mat4::identity();
         result(0, 0) = viewRight.x;
@@ -95,6 +103,19 @@ namespace {
             std::clamp(color.g * amount, 0.0f, 1.0f),
             std::clamp(color.b * amount, 0.0f, 1.0f),
             color.a
+        };
+    }
+
+    WidgeCraft::AABB boundsFor(const Cube& cube) {
+        const float halfSize = cube.size * 0.5f;
+        const WidgeCraft::Vec3 halfExtents{
+            halfSize,
+            halfSize,
+            halfSize
+        };
+        return {
+            cube.center - halfExtents,
+            cube.center + halfExtents
         };
     }
 
@@ -209,7 +230,6 @@ namespace {
                 layout (location = 1) in vec4 aColor;
 
                 uniform mat4 uViewProjection;
-
                 out vec4 vColor;
 
                 void main() {
@@ -366,19 +386,6 @@ namespace {
         std::vector<Vertex> m_vertices;
     };
 
-    WidgeCraft::AABB boundsFor(const Cube& cube) {
-        const float halfSize = cube.size * 0.5f;
-        const WidgeCraft::Vec3 halfExtents{
-            halfSize,
-            halfSize,
-            halfSize
-        };
-        return {
-            cube.center - halfExtents,
-            cube.center + halfExtents
-        };
-    }
-
 } // namespace
 
 int main() {
@@ -505,10 +512,12 @@ int main() {
                         % static_cast<int>(palette.size());
                     cube.color = palette[
                         static_cast<std::size_t>(cube.paletteIndex)];
-                    statusText = "Ray hit cube "
-                        + std::to_string(nearestCube + 1U)
-                        + " at distance "
-                        + std::to_string(nearestDistance).substr(0, 4);
+
+                    std::ostringstream status;
+                    status << "Ray hit cube " << nearestCube + 1U
+                        << " at distance " << std::fixed
+                        << std::setprecision(2) << nearestDistance;
+                    statusText = status.str();
                 } else {
                     statusText = "Ray missed every cube";
                 }
@@ -544,25 +553,32 @@ int main() {
 
             const WidgeCraft::Vec2 mouse = engine.getInput().mousePosition();
             constexpr float crosshairRadius = 7.0f;
+            const WidgeCraft::Color crosshairColor{
+                0.95f,
+                0.95f,
+                1.0f,
+                0.9f
+            };
             shapes.drawLine(
                 mouse.x - crosshairRadius,
                 mouse.y,
                 mouse.x + crosshairRadius,
                 mouse.y,
                 1.5f,
-                { 0.95f, 0.95f, 1.0f, 0.9f });
+                crosshairColor);
             shapes.drawLine(
                 mouse.x,
                 mouse.y - crosshairRadius,
                 mouse.x,
                 mouse.y + crosshairRadius,
                 1.5f,
-                { 0.95f, 0.95f, 1.0f, 0.9f });
+                crosshairColor);
         });
 
         app.Run(60);
     } catch (const std::exception& exception) {
-        std::fprintf(stderr, "WidgeCraft 3D sandbox failed: %s\n", exception.what());
+        std::cerr << "WidgeCraft 3D sandbox failed: "
+            << exception.what() << '\n';
         return 1;
     }
 
