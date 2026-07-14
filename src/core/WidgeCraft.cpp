@@ -7,6 +7,7 @@
 #include <chrono>
 #include <cmath>
 #include <filesystem>
+#include <stdexcept>
 #include <thread>
 #include <utility>
 
@@ -56,14 +57,15 @@ namespace WidgeCraft {
             resolveFontPath(fontPath),
             fontPixelHeight)
         , m_shapes2D()
-        , m_shapes3D() {
+        , m_shapes3D()
+        , m_sceneManager(*this)
+        , m_uiManager(*this) {
         initializeGraphics();
     }
 
     WidgeCraft::~WidgeCraft() {
-        if (m_scene) {
-            m_scene->onDetach(*this);
-        }
+        m_uiManager.shutdown();
+        m_sceneManager.shutdown();
     }
 
     void WidgeCraft::Run(int targetFramesPerSecond) {
@@ -102,22 +104,21 @@ namespace WidgeCraft {
     }
 
     void WidgeCraft::setScene(std::unique_ptr<Scene> scene) {
-        if (m_scene) {
-            m_scene->onDetach(*this);
-        }
-        m_scene = std::move(scene);
-        if (m_scene) {
-            m_scene->onAttach(*this);
-        }
+        m_sceneManager.setTransient(std::move(scene));
     }
 
     void WidgeCraft::useModelViewport(
         const ModelViewport& viewport) {
 
+        // A renderer stores only one current 3D matrix. Flush anything already
+        // queued before selecting the next camera/clip combination.
+        flushSceneQueues();
+
         m_modelViewportRect = viewport.getScreenRect();
         m_modelViewportActive =
             m_modelViewportRect.width > 0.0f
             && m_modelViewportRect.height > 0.0f;
+        m_modelViewportOptions = {};
 
         if (!m_modelViewportActive) {
             m_shapes2D.resetTransform();
@@ -128,9 +129,53 @@ namespace WidgeCraft {
     }
 
     void WidgeCraft::clearModelViewport() {
-        m_modelViewportActive = false;
-        m_modelViewportRect = {};
-        m_shapes2D.resetTransform();
+        if (m_modelViewportActive) {
+            flushSceneQueues();
+        } else {
+            m_shapes2D.resetTransform();
+        }
+    }
+
+    void WidgeCraft::renderViewport(
+        const ModelViewport& viewport,
+        const ViewportRenderCallback& callback,
+        const ViewportRenderOptions& options) {
+
+        if (!callback) {
+            return;
+        }
+        if (m_viewportCallbackActive) {
+            throw std::logic_error(
+                "Viewport render callbacks cannot be nested");
+        }
+
+        flushSceneQueues();
+        m_modelViewportRect = viewport.getScreenRect();
+        m_modelViewportActive =
+            m_modelViewportRect.width > 0.0f
+            && m_modelViewportRect.height > 0.0f;
+        m_modelViewportOptions = options;
+
+        if (!m_modelViewportActive) {
+            return;
+        }
+
+        viewport.configureRenderers(m_shapes2D, m_shapes3D);
+        m_viewportCallbackActive = true;
+        try {
+            callback(*this);
+            m_viewportCallbackActive = false;
+            flushSceneQueues();
+        } catch (...) {
+            m_viewportCallbackActive = false;
+            m_shapes3D.beginFrame();
+            m_shapes2D.beginFrame();
+            m_textRenderer.beginFrame();
+            m_modelViewportActive = false;
+            m_modelViewportRect = {};
+            restoreFullFramebufferState();
+            throw;
+        }
     }
 
     void WidgeCraft::Update() {
@@ -141,9 +186,12 @@ namespace WidgeCraft {
             static_cast<float>(m_window.getWidth()),
             static_cast<float>(m_window.getHeight()));
 
-        if (m_scene) {
-            m_scene->onUpdate(*this, m_deltaTime);
-        }
+        // Scene and UI requests are applied together at the same safe frame
+        // boundary before either newly active object receives an update.
+        m_sceneManager.applyPending();
+        m_uiManager.applyPending();
+        m_sceneManager.update(m_deltaTime);
+        m_uiManager.update(m_deltaTime);
         if (m_updateCallback) {
             m_updateCallback(*this);
         }
@@ -167,59 +215,94 @@ namespace WidgeCraft {
         m_textRenderer.beginFrame();
         m_modelViewportActive = false;
         m_modelViewportRect = {};
+        m_modelViewportOptions = {};
 
-        if (m_scene) {
-            m_scene->onRender(*this);
-        }
+        m_sceneManager.render();
         if (m_renderCallback) {
             m_renderCallback(*this);
         }
+        m_uiManager.renderSceneViews();
 
-        if (m_modelViewportActive) {
-            const Rect clipped = clipToFramebuffer(
-                m_modelViewportRect,
-                framebufferWidth,
-                framebufferHeight);
-
-            const int left = static_cast<int>(std::floor(clipped.x));
-            const int bottom = static_cast<int>(std::floor(clipped.y));
-            const int right = static_cast<int>(std::ceil(clipped.right()));
-            const int top = static_cast<int>(std::ceil(clipped.top()));
-            const int clipWidth = std::max(0, right - left);
-            const int clipHeight = std::max(0, top - bottom);
-
-            glEnable(GL_SCISSOR_TEST);
-            glScissor(left, bottom, clipWidth, clipHeight);
-
-            // 3D uses the model rectangle as its OpenGL viewport. The camera
-            // projection was built from the same aspect ratio.
-            glViewport(left, bottom, clipWidth, clipHeight);
-            m_shapes3D.flush();
-
-            // 2D shapes and text are already transformed into full-framebuffer
-            // coordinates, so only scissoring remains active for these passes.
-            glViewport(0, 0, framebufferWidth, framebufferHeight);
-            m_shapes2D.flush();
-            m_textRenderer.flush();
-
-            glDisable(GL_SCISSOR_TEST);
-        } else {
-            m_shapes3D.flush();
-            m_shapes2D.flush();
-            m_textRenderer.flush();
-        }
+        flushSceneQueues();
 
         // Retained UI always renders in native framebuffer pixels. Scene
         // transforms, clipping and the 3D viewport cannot stretch or crop it.
-        glViewport(0, 0, framebufferWidth, framebufferHeight);
-        glDisable(GL_SCISSOR_TEST);
-        m_shapes2D.resetTransform();
+        restoreFullFramebufferState();
         m_window.getRootFrame().render(
             m_textRenderer,
             m_shapes2D,
             m_window.getInput());
+        m_uiManager.renderUi();
         m_shapes2D.flush();
         m_textRenderer.flush();
+    }
+
+    void WidgeCraft::flushSceneQueues() {
+        const int framebufferWidth = m_window.getWidth();
+        const int framebufferHeight = m_window.getHeight();
+
+        if (!m_modelViewportActive) {
+            restoreFullFramebufferState();
+            m_shapes3D.flush();
+            m_shapes2D.flush();
+            m_textRenderer.flush();
+            return;
+        }
+
+        const Rect clipped = clipToFramebuffer(
+            m_modelViewportRect,
+            framebufferWidth,
+            framebufferHeight);
+
+        const int left = static_cast<int>(std::floor(clipped.x));
+        const int bottom = static_cast<int>(std::floor(clipped.y));
+        const int right = static_cast<int>(std::ceil(clipped.right()));
+        const int top = static_cast<int>(std::ceil(clipped.top()));
+        const int clipWidth = std::max(0, right - left);
+        const int clipHeight = std::max(0, top - bottom);
+
+        glEnable(GL_SCISSOR_TEST);
+        glScissor(left, bottom, clipWidth, clipHeight);
+        glViewport(left, bottom, clipWidth, clipHeight);
+
+        GLbitfield clearMask = 0;
+        if (m_modelViewportOptions.clearColor) {
+            const Color color = m_modelViewportOptions.color;
+            glClearColor(color.r, color.g, color.b, color.a);
+            clearMask |= GL_COLOR_BUFFER_BIT;
+        }
+        if (m_modelViewportOptions.clearDepth) {
+            clearMask |= GL_DEPTH_BUFFER_BIT;
+        }
+        if (clearMask != 0 && clipWidth > 0 && clipHeight > 0) {
+            glClear(clearMask);
+        }
+
+        // 3D uses the model rectangle as its OpenGL viewport. Its depth area is
+        // cleared per pass so an overlaid minimap cannot inherit world depth.
+        m_shapes3D.flush();
+
+        // 2D vertices and scene text use full-framebuffer pixel coordinates;
+        // the viewport's scissor remains active while the full viewport returns.
+        glViewport(0, 0, framebufferWidth, framebufferHeight);
+        m_shapes2D.flush();
+        m_textRenderer.flush();
+
+        m_modelViewportActive = false;
+        m_modelViewportRect = {};
+        m_modelViewportOptions = {};
+        restoreFullFramebufferState();
+    }
+
+    void WidgeCraft::restoreFullFramebufferState() {
+        glViewport(0, 0, m_window.getWidth(), m_window.getHeight());
+        glDisable(GL_SCISSOR_TEST);
+        glClearColor(
+            m_clearColor.r,
+            m_clearColor.g,
+            m_clearColor.b,
+            m_clearColor.a);
+        m_shapes2D.resetTransform();
     }
 
     void WidgeCraft::initializeGraphics() {

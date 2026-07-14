@@ -101,6 +101,18 @@ namespace WidgeCraft {
         return { position.x, position.y, m_size.x, m_size.y };
     }
 
+    Rect Frame::getVisibleRect() const {
+        Rect visible = getAbsoluteRect();
+        for (const Frame* ancestor = m_parent;
+             ancestor;
+             ancestor = ancestor->m_parent) {
+            if (ancestor->clipsContents()) {
+                visible = intersect(visible, ancestor->getAbsoluteRect());
+            }
+        }
+        return visible;
+    }
+
     Frame& Frame::createChildFrame(const std::string& name) {
         if (findChildFrame(name)) {
             throw std::invalid_argument("A child frame named '" + name + "' already exists in frame '" + m_name + "'");

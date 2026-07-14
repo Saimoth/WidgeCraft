@@ -6,6 +6,18 @@
 
 namespace WidgeCraft {
 
+    // Values match GLFW's stable public key codes without exposing GLFW in
+    // engine-facing headers.
+    enum class Key : int {
+        Space = 32,
+        A = 65,
+        D = 68,
+        S = 83,
+        W = 87,
+        Escape = 256,
+        LeftShift = 340
+    };
+
     enum class MouseButton : int {
         Left = 0,
         Right = 1,
@@ -22,6 +34,15 @@ namespace WidgeCraft {
         bool keyDown(int key) const;
         bool keyPressed(int key) const;
         bool keyReleased(int key) const;
+        bool keyDown(Key key) const {
+            return keyDown(static_cast<int>(key));
+        }
+        bool keyPressed(Key key) const {
+            return keyPressed(static_cast<int>(key));
+        }
+        bool keyReleased(Key key) const {
+            return keyReleased(static_cast<int>(key));
+        }
 
         bool mouseDown(MouseButton button) const;
         bool mousePressed(MouseButton button) const;
