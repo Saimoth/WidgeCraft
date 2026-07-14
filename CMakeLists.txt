@@ -92,12 +92,18 @@ if(WIDGECRAFT_BUILD_DEMO)
     )
 endif()
 
-# ---------------- 3D raycast sandbox ----------------
+# ---------------- Interactive raycast sandbox test ----------------
 if(WIDGECRAFT_BUILD_SANDBOX)
-    add_executable(widgecraft_3d_sandbox examples/ThreeDSandbox.cpp)
-    set_target_properties(widgecraft_3d_sandbox PROPERTIES FOLDER "Examples")
+    add_executable(widgecraft_3d_sandbox tests/ThreeDSandbox.cpp)
+    set_target_properties(widgecraft_3d_sandbox PROPERTIES FOLDER "Tests")
     target_link_libraries(widgecraft_3d_sandbox PRIVATE WidgeCraft::Engine)
     widgecraft_enable_warnings(widgecraft_3d_sandbox)
+
+    # Make the generated Visual Studio solution launch the sandbox by default.
+    set_property(
+        DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+        PROPERTY VS_STARTUP_PROJECT widgecraft_3d_sandbox
+    )
 
     add_custom_command(TARGET widgecraft_3d_sandbox POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_directory
