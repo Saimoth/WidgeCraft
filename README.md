@@ -103,7 +103,7 @@ if (WidgeCraft::raycast(ray, objectBounds, hit)) {
 
 ## 3D raycast sandbox
 
-The `widgecraft_3d_sandbox` executable is an interactive integration test for camera movement, 3D rendering, input and ray picking. It renders eight coloured cubes and uses `screenPointToRay` plus AABB intersection to select the nearest cube under the pointer.
+The `widgecraft_3d_sandbox` executable is an interactive integration test for camera movement, 3D rendering, input and ray picking. Its source now sits beside `RaycastTests.cpp` in the `tests` directory. It renders eight coloured cubes and uses `screenPointToRay` plus AABB intersection to select the nearest cube under the pointer.
 
 Controls:
 
@@ -132,6 +132,8 @@ Open:
 ```text
 build\win32-release\WidgeCraft.sln
 ```
+
+The generated Visual Studio solution uses `widgecraft_3d_sandbox` as its default startup project when the sandbox option is enabled.
 
 The main targets are:
 
@@ -168,10 +170,9 @@ Assets are copied beside each executable after a successful build.
 
 ```text
 assets/                 Fonts and future engine assets
-examples/               Interactive integration sandboxes
 include/WidgeCraft/     Public engine headers
 src/                    Engine implementation and main showcase
-tests/                  Non-graphical unit tests
+tests/                  Unit tests and interactive raycast sandbox
 third_party/            Header-only third-party source
 .github/workflows/      Win32 CI build and tests
 ```
