@@ -1,171 +1,220 @@
 #include "WidgeCraft/WidgeCraft.hpp"
 
+#include <algorithm>
 #include <exception>
 #include <iostream>
 #include <string>
 
 int main() {
     try {
-        constexpr float sceneWidth = 1100.0f;
-        constexpr float sceneHeight = 720.0f;
-
         WidgeCraft::WidgeCraft app(
-            "WidgeCraft UI Sandbox",
-            static_cast<int>(sceneWidth),
-            static_cast<int>(sceneHeight));
-        app.setClearColor({ 0.030f, 0.040f, 0.060f, 1.0f });
+            "WidgeCraft Model Viewport Sandbox",
+            1100,
+            720);
+        app.setClearColor({ 0.020f, 0.028f, 0.044f, 1.0f });
 
-        WidgeCraft::SceneViewport2D sceneViewport(
-            sceneWidth,
-            sceneHeight);
+        WidgeCraft::ModelViewport modelViewport;
+        modelViewport.getCamera2D().setPosition({ 0.0f, 0.0f });
+        modelViewport.getCamera2D().setZoom(1.0f);
+        modelViewport.getCamera3D().setPosition({ 6.0f, 4.5f, 9.0f });
+        modelViewport.getCamera3D().setTarget({ 0.0f, 0.0f, 0.0f });
+        modelViewport.getCamera3D().setPerspective(52.0f, 0.1f, 500.0f);
 
         auto& root = app.getRootFrame();
         root.setBackgroundVisible(false);
 
-        auto& panel = root.createChildFrame("Main Panel");
-        panel.setAnchor(WidgeCraft::Anchor::Center);
-        panel.setPosition(0.0f, 0.0f);
-        panel.setSize(520.0f, 370.0f);
-        panel.setBackgroundColor({ 0.070f, 0.090f, 0.125f, 0.97f });
+        auto& modelFrame = root.createChildFrame("Model Area");
+        modelFrame.setAnchor(WidgeCraft::Anchor::BottomLeft);
+        modelFrame.setPosition(28.0f, 28.0f);
+        modelFrame.setSize(1044.0f, 664.0f);
+        modelFrame.setBackgroundVisible(false);
+        modelFrame.setBorderVisible(true);
+        modelFrame.setBorderColor({ 0.22f, 0.43f, 0.68f, 1.0f });
+        modelFrame.setBorderThickness(3.0f);
+
+        auto& panel = root.createChildFrame("Controls");
+        panel.setAnchor(WidgeCraft::Anchor::TopLeft);
+        panel.setPosition(48.0f, 48.0f);
+        panel.setSize(360.0f, 214.0f);
+        panel.setBackgroundColor({ 0.055f, 0.072f, 0.105f, 0.96f });
         panel.setBorderVisible(true);
-        panel.setBorderColor({ 0.28f, 0.48f, 0.72f, 1.0f });
+        panel.setBorderColor({ 0.25f, 0.46f, 0.70f, 1.0f });
         panel.setBorderThickness(2.0f);
 
         auto& title = panel.addWidget<WidgeCraft::Label>(
             "Title",
-            "WidgeCraft UI Sandbox");
+            "Model Viewport");
         title.setAnchor(WidgeCraft::Anchor::TopLeft);
-        title.setPosition(24.0f, 20.0f);
-        title.setTextSize(30.0f);
-        title.setColor({ 0.74f, 0.90f, 1.0f, 1.0f });
+        title.setPosition(20.0f, 16.0f);
+        title.setTextSize(28.0f);
+        title.setColor({ 0.76f, 0.91f, 1.0f, 1.0f });
 
         auto& subtitle = panel.addWidget<WidgeCraft::Label>(
             "Subtitle",
-            "Frames, widgets and a fixed-aspect 2D scene");
+            "Clipped 2D, 3D and scene text");
         subtitle.setAnchor(WidgeCraft::Anchor::TopLeft);
-        subtitle.setPosition(24.0f, 62.0f);
-        subtitle.setTextSize(16.0f);
-        subtitle.setColor({ 0.65f, 0.71f, 0.82f, 1.0f });
+        subtitle.setPosition(20.0f, 54.0f);
+        subtitle.setTextSize(15.0f);
+        subtitle.setColor({ 0.63f, 0.72f, 0.84f, 1.0f });
 
-        auto& statusCard = panel.createChildFrame("Status Card");
-        statusCard.setAnchor(WidgeCraft::Anchor::TopLeft);
-        statusCard.setPosition(24.0f, 108.0f);
-        statusCard.setSize(472.0f, 92.0f);
-        statusCard.setBackgroundColor({ 0.045f, 0.060f, 0.085f, 1.0f });
-        statusCard.setBorderVisible(true);
-        statusCard.setBorderColor({ 0.16f, 0.24f, 0.34f, 1.0f });
-        statusCard.setBorderThickness(1.0f);
-
-        auto& status = statusCard.addWidget<WidgeCraft::Label>(
+        auto& status = panel.addWidget<WidgeCraft::Label>(
             "Status",
-            "Resize the window: scene shapes keep their proportions.");
-        status.setAnchor(WidgeCraft::Anchor::CenterLeft);
-        status.setPosition(18.0f, 0.0f);
-        status.setSize(430.0f, 34.0f);
-        status.setTextSize(18.0f);
-        status.setColor({ 0.66f, 0.88f, 0.72f, 1.0f });
+            "Resize the window or change 2D zoom.");
+        status.setAnchor(WidgeCraft::Anchor::TopLeft);
+        status.setPosition(20.0f, 86.0f);
+        status.setSize(320.0f, 28.0f);
+        status.setTextSize(15.0f);
+        status.setColor({ 0.67f, 0.88f, 0.72f, 1.0f });
 
-        bool showDecoration = true;
-        int clickCount = 0;
+        float cameraZoom = 1.0f;
+        bool show3D = true;
 
-        auto& action = panel.addWidget<WidgeCraft::Button>(
-            "Action",
-            "Press me");
-        action.setAnchor(WidgeCraft::Anchor::BottomLeft);
-        action.setPosition(24.0f, 30.0f);
-        action.setSize(138.0f, 46.0f);
-        action.setTextSize(17.0f);
-        action.setOnClick([&]() {
-            ++clickCount;
-            status.setText(
-                "Button pressed "
-                + std::to_string(clickCount)
-                + (clickCount == 1 ? " time." : " times."));
+        auto& zoomIn = panel.addWidget<WidgeCraft::Button>(
+            "Zoom In",
+            "Zoom +");
+        zoomIn.setAnchor(WidgeCraft::Anchor::BottomLeft);
+        zoomIn.setPosition(20.0f, 22.0f);
+        zoomIn.setSize(92.0f, 42.0f);
+        zoomIn.setTextSize(16.0f);
+        zoomIn.setOnClick([&]() {
+            cameraZoom = std::min(cameraZoom * 1.25f, 4.0f);
+            status.setText("2D zoom: " + std::to_string(cameraZoom));
         });
 
-        auto& reset = panel.addWidget<WidgeCraft::Button>(
-            "Reset",
-            "Reset");
-        reset.setAnchor(WidgeCraft::Anchor::BottomLeft);
-        reset.setPosition(176.0f, 30.0f);
-        reset.setSize(112.0f, 46.0f);
-        reset.setTextSize(17.0f);
-        reset.setOnClick([&]() {
-            clickCount = 0;
-            status.setText("Counter reset.");
+        auto& zoomOut = panel.addWidget<WidgeCraft::Button>(
+            "Zoom Out",
+            "Zoom -");
+        zoomOut.setAnchor(WidgeCraft::Anchor::BottomLeft);
+        zoomOut.setPosition(124.0f, 22.0f);
+        zoomOut.setSize(92.0f, 42.0f);
+        zoomOut.setTextSize(16.0f);
+        zoomOut.setOnClick([&]() {
+            cameraZoom = std::max(cameraZoom / 1.25f, 0.25f);
+            status.setText("2D zoom: " + std::to_string(cameraZoom));
         });
 
-        auto& decoration = panel.addWidget<WidgeCraft::Checkbox>(
-            "Decoration",
-            "Show scene decoration",
-            showDecoration);
-        decoration.setAnchor(WidgeCraft::Anchor::BottomRight);
-        decoration.setPosition(24.0f, 40.0f);
-        decoration.setTextSize(16.0f);
-        decoration.setOnChanged([&](bool checked) {
-            showDecoration = checked;
+        auto& threeDToggle = panel.addWidget<WidgeCraft::Checkbox>(
+            "3D Toggle",
+            "Show 3D cubes",
+            show3D);
+        threeDToggle.setAnchor(WidgeCraft::Anchor::BottomRight);
+        threeDToggle.setPosition(20.0f, 31.0f);
+        threeDToggle.setTextSize(15.0f);
+        threeDToggle.setOnChanged([&](bool checked) {
+            show3D = checked;
             status.setText(
-                checked
-                ? "Scene decoration enabled."
-                : "Scene decoration hidden.");
+                checked ? "3D scene enabled." : "3D scene hidden.");
         });
 
         app.setRenderCallback([&](WidgeCraft::WidgeCraft& engine) {
-            if (!showDecoration) {
-                return;
+            const float windowWidth =
+                static_cast<float>(engine.getWindow().getWidth());
+            const float windowHeight =
+                static_cast<float>(engine.getWindow().getHeight());
+
+            modelFrame.setSize(
+                std::max(windowWidth - 56.0f, 40.0f),
+                std::max(windowHeight - 56.0f, 40.0f));
+
+            const WidgeCraft::Rect frameRect = modelFrame.getAbsoluteRect();
+            modelViewport.setScreenRect({
+                frameRect.x + 4.0f,
+                frameRect.y + 4.0f,
+                std::max(frameRect.width - 8.0f, 1.0f),
+                std::max(frameRect.height - 8.0f, 1.0f)
+            });
+            modelViewport.getCamera2D().setZoom(cameraZoom);
+            engine.useModelViewport(modelViewport);
+
+            auto& shapes2D = engine.getShapes2D();
+            auto& shapes3D = engine.getShapes3D();
+            auto& text = engine.getTextRenderer();
+
+            for (int x = -1200; x <= 1200; x += 80) {
+                const bool major = (x % 400) == 0;
+                shapes2D.drawLine(
+                    static_cast<float>(x), -900.0f,
+                    static_cast<float>(x), 900.0f,
+                    major ? 2.0f : 1.0f,
+                    major
+                        ? WidgeCraft::Color{ 0.14f, 0.26f, 0.38f, 0.72f }
+                        : WidgeCraft::Color{ 0.08f, 0.13f, 0.20f, 0.60f });
+            }
+            for (int y = -900; y <= 900; y += 80) {
+                const bool major = (y % 400) == 0;
+                shapes2D.drawLine(
+                    -1200.0f, static_cast<float>(y),
+                    1200.0f, static_cast<float>(y),
+                    major ? 2.0f : 1.0f,
+                    major
+                        ? WidgeCraft::Color{ 0.14f, 0.26f, 0.38f, 0.72f }
+                        : WidgeCraft::Color{ 0.08f, 0.13f, 0.20f, 0.60f });
             }
 
-            auto& shapes = engine.getShapes2D();
-            const float width = static_cast<float>(
-                engine.getWindow().getWidth());
-            const float height = static_cast<float>(
-                engine.getWindow().getHeight());
-
-            sceneViewport.resize(width, height);
-            shapes.setTransform(
-                sceneViewport.getOffset(),
-                sceneViewport.getScale());
-
             WidgeCraft::ShapeStyle2D circleStyle;
-            circleStyle.fillColor = { 0.06f, 0.20f, 0.30f, 0.75f };
-            circleStyle.edgeColor = { 0.25f, 0.68f, 0.92f, 0.9f };
-            circleStyle.edgeThickness = 3.0f;
+            circleStyle.fillColor = { 0.06f, 0.30f, 0.42f, 0.72f };
+            circleStyle.edgeColor = { 0.32f, 0.82f, 1.0f, 1.0f };
+            circleStyle.edgeThickness = 4.0f;
             circleStyle.edgeVisible = true;
-            shapes.drawCircle(
-                { sceneWidth * 0.18f, sceneHeight * 0.74f },
-                92.0f,
-                circleStyle);
+            shapes2D.drawCircle({ -330.0f, -180.0f }, 92.0f, circleStyle);
 
             WidgeCraft::ShapeStyle2D rectangleStyle;
-            rectangleStyle.fillColor = { 0.16f, 0.08f, 0.24f, 0.70f };
-            rectangleStyle.edgeColor = { 0.66f, 0.38f, 0.90f, 0.95f };
+            rectangleStyle.fillColor = { 0.24f, 0.09f, 0.34f, 0.72f };
+            rectangleStyle.edgeColor = { 0.76f, 0.42f, 0.94f, 1.0f };
             rectangleStyle.edgeThickness = 4.0f;
             rectangleStyle.edgeVisible = true;
-            shapes.drawRect(
-                {
-                    sceneWidth * 0.74f,
-                    sceneHeight * 0.18f,
-                    170.0f,
-                    116.0f
-                },
+            shapes2D.drawRect(
+                { 230.0f, -245.0f, 190.0f, 130.0f },
                 rectangleStyle);
 
             WidgeCraft::ShapeStyle2D triangleStyle;
-            triangleStyle.fillColor = { 0.10f, 0.28f, 0.18f, 0.72f };
-            triangleStyle.edgeColor = { 0.35f, 0.84f, 0.56f, 0.95f };
+            triangleStyle.fillColor = { 0.08f, 0.34f, 0.20f, 0.74f };
+            triangleStyle.edgeColor = { 0.38f, 0.92f, 0.58f, 1.0f };
             triangleStyle.edgeThickness = 4.0f;
             triangleStyle.edgeVisible = true;
-            shapes.drawTriangle(
-                { sceneWidth * 0.79f, sceneHeight * 0.78f },
-                { sceneWidth * 0.90f, sceneHeight * 0.58f },
-                { sceneWidth * 0.68f, sceneHeight * 0.58f },
+            shapes2D.drawTriangle(
+                { 315.0f, 260.0f },
+                { 425.0f, 70.0f },
+                { 205.0f, 70.0f },
                 triangleStyle);
+
+            modelViewport.drawWorldText2D(
+                text,
+                "2D world text",
+                { -430.0f, 275.0f },
+                28.0f,
+                { 0.76f, 0.90f, 1.0f, 1.0f });
+
+            if (show3D) {
+                WidgeCraft::ShapeStyle3D cubeStyle;
+                cubeStyle.fillColor = { 0.14f, 0.42f, 0.72f, 0.78f };
+                cubeStyle.edgeColor = { 0.72f, 0.90f, 1.0f, 1.0f };
+                cubeStyle.edgeThickness = 2.0f;
+                cubeStyle.edgeVisible = true;
+
+                shapes3D.drawCube({ -1.7f, 0.0f, 0.0f }, 1.8f, cubeStyle);
+                cubeStyle.fillColor = { 0.64f, 0.25f, 0.18f, 0.78f };
+                shapes3D.drawCube({ 1.2f, 0.5f, -1.0f }, 2.0f, cubeStyle);
+
+                modelViewport.drawLabel3D(
+                    text,
+                    "Cube A",
+                    { -1.7f, 1.15f, 0.0f },
+                    17.0f,
+                    { 0.84f, 0.94f, 1.0f, 1.0f });
+                modelViewport.drawWorldText3D(
+                    text,
+                    "World-sized",
+                    { 1.2f, 1.75f, -1.0f },
+                    0.45f,
+                    { 1.0f, 0.82f, 0.62f, 1.0f });
+            }
         });
 
         app.Run(60);
     } catch (const std::exception& exception) {
-        std::cerr << "WidgeCraft UI sandbox failed: "
-            << exception.what() << '\n';
+        std::cerr << "WidgeCraft viewport sandbox failed: "
+                  << exception.what() << '\n';
         return 1;
     }
 
