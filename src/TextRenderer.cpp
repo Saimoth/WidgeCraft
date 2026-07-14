@@ -21,9 +21,9 @@ namespace WidgeCraft {
 
     namespace {
         constexpr int kAtlasSize = 2048;
-        constexpr int kPadding = 8;
-        constexpr unsigned char kOnEdgeValue = 180;
-        constexpr float kPixelDistanceScale = 64.0f;
+        constexpr int kPadding = 12;
+        constexpr unsigned char kOnEdgeValue = 128;
+        constexpr float kPixelDistanceScale = 16.0f;
 
         constexpr std::string_view kVertexShader = R"(
             #version 330 core
@@ -50,17 +50,38 @@ namespace WidgeCraft {
 
             uniform sampler2D uTexture;
             uniform float uEdgeValue;
+            // Normalized SDF value change produced by one source-atlas texel.
             uniform float uSoftness;
 
             out vec4 fragColor;
 
             void main() {
-                float signedDistance = texture(uTexture, vTexCoord).r;
-                float antialiasWidth = max(fwidth(signedDistance) * uSoftness, 0.00075);
+                float fieldValue = texture(uTexture, vTexCoord).r;
+
+                // Derive scale from the UV mapping rather than from the sampled
+                // distance value. This stays constant over both triangles of a
+                // glyph quad, avoiding visible diagonal derivative seams.
+                vec2 atlasSize = vec2(textureSize(uTexture, 0));
+                vec2 atlasDx = dFdx(vTexCoord * atlasSize);
+                vec2 atlasDy = dFdy(vTexCoord * atlasSize);
+                float texelsPerScreenPixel = max(
+                    max(length(atlasDx), length(atlasDy)),
+                    0.0001);
+                float screenPixelsPerTexel = 1.0 / texelsPerScreenPixel;
+
+                float sourceDistance =
+                    (fieldValue - uEdgeValue) / max(uSoftness, 0.00001);
+                float screenDistance = sourceDistance * screenPixelsPerTexel;
+
+                // A very small optical weight correction preserves narrow stems
+                // when the atlas is heavily minified (for example around 12 px).
+                float minification = clamp(texelsPerScreenPixel - 1.0, 0.0, 1.5);
+                float opticalBias = minification * 0.08;
+
                 float alpha = smoothstep(
-                    uEdgeValue - antialiasWidth,
-                    uEdgeValue + antialiasWidth,
-                    signedDistance);
+                    -0.5,
+                    0.5,
+                    screenDistance + opticalBias);
                 fragColor = vec4(vColor.rgb, vColor.a * alpha);
             }
         )";
@@ -141,7 +162,8 @@ namespace WidgeCraft {
 
                 bool valid = true;
                 for (int continuation = 1; continuation <= continuationCount; ++continuation) {
-                    const auto value = static_cast<unsigned char>(text[index + static_cast<std::size_t>(continuation)]);
+                    const auto value = static_cast<unsigned char>(
+                        text[index + static_cast<std::size_t>(continuation)]);
                     if ((value & 0xC0U) != 0x80U) {
                         valid = false;
                         break;
@@ -153,7 +175,9 @@ namespace WidgeCraft {
                     (continuationCount == 1 && codepoint < 0x80U)
                     || (continuationCount == 2 && codepoint < 0x800U)
                     || (continuationCount == 3 && codepoint < 0x10000U);
-                const bool invalidRange = codepoint > 0x10FFFFU || (codepoint >= 0xD800U && codepoint <= 0xDFFFU);
+                const bool invalidRange =
+                    codepoint > 0x10FFFFU
+                    || (codepoint >= 0xD800U && codepoint <= 0xDFFFU);
 
                 if (!valid || overlong || invalidRange) {
                     output.push_back(U'\uFFFD');
@@ -185,7 +209,11 @@ namespace WidgeCraft {
 
     } // namespace
 
-    TextRenderer::TextRenderer(int screenWidth, int screenHeight, const std::string& fontPath, float fontPixelHeight)
+    TextRenderer::TextRenderer(
+        int screenWidth,
+        int screenHeight,
+        const std::string& fontPath,
+        float fontPixelHeight)
         : m_fontInfo(std::make_unique<stbtt_fontinfo>())
         , m_screenWidth(screenWidth)
         , m_screenHeight(screenHeight) {
@@ -238,7 +266,11 @@ namespace WidgeCraft {
         }
 
         glUseProgram(m_shader);
-        glUniformMatrix4fv(m_uniformProjection, 1, GL_FALSE, m_projection.values.data());
+        glUniformMatrix4fv(
+            m_uniformProjection,
+            1,
+            GL_FALSE,
+            m_projection.values.data());
         glUniform1f(m_uniformEdgeValue, m_edgeValue);
         glUniform1f(m_uniformSoftness, m_softness);
 
@@ -260,7 +292,13 @@ namespace WidgeCraft {
         m_vertices.clear();
     }
 
-    void TextRenderer::renderText(const std::string& text, float x, float y, float sizePixels, Color color) {
+    void TextRenderer::renderText(
+        const std::string& text,
+        float x,
+        float y,
+        float sizePixels,
+        Color color) {
+
         if (text.empty() || m_basePixelHeight <= 0.0f) {
             return;
         }
@@ -293,15 +331,52 @@ namespace WidgeCraft {
             }
 
             const float xPosition = cursorX + glyph->xOffset * sizeScale;
-            const float yPosition = cursorY - (glyph->yOffset + glyph->height) * sizeScale;
+            const float yPosition =
+                cursorY - (glyph->yOffset + glyph->height) * sizeScale;
             const float width = glyph->width * sizeScale;
             const float height = glyph->height * sizeScale;
 
             if (width > 0.0f && height > 0.0f) {
-                const Vertex bottomLeft{ xPosition, yPosition, glyph->u0, glyph->v0, color.r, color.g, color.b, color.a };
-                const Vertex bottomRight{ xPosition + width, yPosition, glyph->u1, glyph->v0, color.r, color.g, color.b, color.a };
-                const Vertex topRight{ xPosition + width, yPosition + height, glyph->u1, glyph->v1, color.r, color.g, color.b, color.a };
-                const Vertex topLeft{ xPosition, yPosition + height, glyph->u0, glyph->v1, color.r, color.g, color.b, color.a };
+                const Vertex bottomLeft{
+                    xPosition,
+                    yPosition,
+                    glyph->u0,
+                    glyph->v0,
+                    color.r,
+                    color.g,
+                    color.b,
+                    color.a
+                };
+                const Vertex bottomRight{
+                    xPosition + width,
+                    yPosition,
+                    glyph->u1,
+                    glyph->v0,
+                    color.r,
+                    color.g,
+                    color.b,
+                    color.a
+                };
+                const Vertex topRight{
+                    xPosition + width,
+                    yPosition + height,
+                    glyph->u1,
+                    glyph->v1,
+                    color.r,
+                    color.g,
+                    color.b,
+                    color.a
+                };
+                const Vertex topLeft{
+                    xPosition,
+                    yPosition + height,
+                    glyph->u0,
+                    glyph->v1,
+                    color.r,
+                    color.g,
+                    color.b,
+                    color.a
+                };
 
                 m_vertices.push_back(bottomLeft);
                 m_vertices.push_back(bottomRight);
@@ -322,25 +397,37 @@ namespace WidgeCraft {
                             m_fontInfo.get(),
                             glyph->glyphIndex,
                             nextGlyph->glyphIndex);
-                        cursorX += static_cast<float>(kerning) * m_scale * sizeScale;
+                        cursorX +=
+                            static_cast<float>(kerning) * m_scale * sizeScale;
                     }
                 }
             }
         }
     }
 
-    void TextRenderer::renderTextCentered(const std::string& text, float centerX, float centerY, float sizePixels, Color color) {
+    void TextRenderer::renderTextCentered(
+        const std::string& text,
+        float centerX,
+        float centerY,
+        float sizePixels,
+        Color color) {
+
         const auto bounds = measureTextBounds(text, sizePixels);
         if (!bounds) {
             return;
         }
 
-        const float x = centerX - (bounds->minX + bounds->maxX) * 0.5f;
-        const float y = centerY - (bounds->minY + bounds->maxY) * 0.5f;
+        const float x =
+            centerX - (bounds->minX + bounds->maxX) * 0.5f;
+        const float y =
+            centerY - (bounds->minY + bounds->maxY) * 0.5f;
         renderText(text, x, y, sizePixels, color);
     }
 
-    std::optional<TextRenderer::TextBounds> TextRenderer::measureTextBounds(const std::string& text, float sizePixels) const {
+    std::optional<TextRenderer::TextBounds> TextRenderer::measureTextBounds(
+        const std::string& text,
+        float sizePixels) const {
+
         if (text.empty() || m_basePixelHeight <= 0.0f) {
             return std::nullopt;
         }
@@ -382,8 +469,10 @@ namespace WidgeCraft {
                 continue;
             }
 
-            const float xPosition = cursorX + glyph->xOffset * sizeScale;
-            const float yPosition = cursorY - (glyph->yOffset + glyph->height) * sizeScale;
+            const float xPosition =
+                cursorX + glyph->xOffset * sizeScale;
+            const float yPosition =
+                cursorY - (glyph->yOffset + glyph->height) * sizeScale;
             const float width = glyph->width * sizeScale;
             const float height = glyph->height * sizeScale;
 
@@ -406,7 +495,8 @@ namespace WidgeCraft {
                             m_fontInfo.get(),
                             glyph->glyphIndex,
                             nextGlyph->glyphIndex);
-                        cursorX += static_cast<float>(kerning) * m_scale * sizeScale;
+                        cursorX +=
+                            static_cast<float>(kerning) * m_scale * sizeScale;
                     }
                 }
             }
@@ -416,7 +506,8 @@ namespace WidgeCraft {
 
         maximumLineWidth = std::max(maximumLineWidth, cursorX);
         const float metricsTop = m_ascent * sizeScale;
-        const float metricsBottom = lowestBaseline + m_descent * sizeScale;
+        const float metricsBottom =
+            lowestBaseline + m_descent * sizeScale;
 
         if (!hasGeometry) {
             minX = 0.0f;
@@ -433,7 +524,10 @@ namespace WidgeCraft {
         return TextBounds{ minX, minY, maxX, maxY };
     }
 
-    float TextRenderer::measureTextWidth(const std::string& text, float sizePixels) const {
+    float TextRenderer::measureTextWidth(
+        const std::string& text,
+        float sizePixels) const {
+
         const auto bounds = measureTextBounds(text, sizePixels);
         return bounds ? bounds->width() : 0.0f;
     }
@@ -522,12 +616,17 @@ namespace WidgeCraft {
         file.seekg(0, std::ios::beg);
 
         m_fontBuffer.resize(static_cast<std::size_t>(fileSize));
-        file.read(reinterpret_cast<char*>(m_fontBuffer.data()), static_cast<std::streamsize>(fileSize));
+        file.read(
+            reinterpret_cast<char*>(m_fontBuffer.data()),
+            static_cast<std::streamsize>(fileSize));
         if (!file) {
             return false;
         }
 
-        return stbtt_InitFont(m_fontInfo.get(), m_fontBuffer.data(), 0) != 0;
+        return stbtt_InitFont(
+            m_fontInfo.get(),
+            m_fontBuffer.data(),
+            0) != 0;
     }
 
     void TextRenderer::buildAtlas(float pixelHeight) {
@@ -539,19 +638,29 @@ namespace WidgeCraft {
         m_glyphs.clear();
         m_atlasWidth = kAtlasSize;
         m_atlasHeight = kAtlasSize;
-        m_atlasData.assign(static_cast<std::size_t>(m_atlasWidth * m_atlasHeight), 0);
-        m_scale = stbtt_ScaleForPixelHeight(m_fontInfo.get(), pixelHeight);
+        m_atlasData.assign(
+            static_cast<std::size_t>(m_atlasWidth * m_atlasHeight),
+            0);
+        m_scale = stbtt_ScaleForPixelHeight(
+            m_fontInfo.get(),
+            pixelHeight);
 
         int ascent = 0;
         int descent = 0;
         int lineGap = 0;
-        stbtt_GetFontVMetrics(m_fontInfo.get(), &ascent, &descent, &lineGap);
+        stbtt_GetFontVMetrics(
+            m_fontInfo.get(),
+            &ascent,
+            &descent,
+            &lineGap);
         m_ascent = static_cast<float>(ascent) * m_scale;
         m_descent = static_cast<float>(descent) * m_scale;
-        m_lineHeight = static_cast<float>(ascent - descent + lineGap) * m_scale;
+        m_lineHeight =
+            static_cast<float>(ascent - descent + lineGap) * m_scale;
         m_basePixelHeight = m_ascent - m_descent;
 
-        const std::vector<char32_t> requestedCodepoints = defaultCodepoints();
+        const std::vector<char32_t> requestedCodepoints =
+            defaultCodepoints();
         std::unordered_set<char32_t> seen;
         seen.reserve(requestedCodepoints.size());
         m_glyphs.reserve(requestedCodepoints.size());
@@ -565,7 +674,9 @@ namespace WidgeCraft {
                 continue;
             }
 
-            const int glyphIndex = stbtt_FindGlyphIndex(m_fontInfo.get(), static_cast<int>(codepoint));
+            const int glyphIndex = stbtt_FindGlyphIndex(
+                m_fontInfo.get(),
+                static_cast<int>(codepoint));
             if (glyphIndex == 0 && codepoint != U'?') {
                 continue;
             }
@@ -576,7 +687,10 @@ namespace WidgeCraft {
             int yOffset = 0;
             unsigned char* sdf = nullptr;
 
-            if (stbtt_IsGlyphEmpty(m_fontInfo.get(), glyphIndex) == 0) {
+            if (stbtt_IsGlyphEmpty(
+                    m_fontInfo.get(),
+                    glyphIndex) == 0) {
+
                 sdf = stbtt_GetGlyphSDF(
                     m_fontInfo.get(),
                     m_scale,
@@ -598,33 +712,62 @@ namespace WidgeCraft {
                 }
                 if (penY + height + kPadding > m_atlasHeight) {
                     stbtt_FreeSDF(sdf, nullptr);
-                    throw std::runtime_error("SDF font atlas is too small for the default character set");
+                    throw std::runtime_error(
+                        "SDF font atlas is too small for the "
+                        "default character set");
                 }
 
                 for (int row = 0; row < height; ++row) {
-                    unsigned char* destination = m_atlasData.data()
-                        + static_cast<std::size_t>((penY + row) * m_atlasWidth + penX);
-                    const unsigned char* source = sdf + static_cast<std::size_t>(row * width);
-                    std::copy(source, source + width, destination);
+                    unsigned char* destination =
+                        m_atlasData.data()
+                        + static_cast<std::size_t>(
+                            (penY + row) * m_atlasWidth + penX);
+                    const unsigned char* source =
+                        sdf + static_cast<std::size_t>(row * width);
+                    std::copy(
+                        source,
+                        source + width,
+                        destination);
                 }
                 rowHeight = std::max(rowHeight, height);
             }
 
             int advanceWidth = 0;
             int leftSideBearing = 0;
-            stbtt_GetGlyphHMetrics(m_fontInfo.get(), glyphIndex, &advanceWidth, &leftSideBearing);
+            stbtt_GetGlyphHMetrics(
+                m_fontInfo.get(),
+                glyphIndex,
+                &advanceWidth,
+                &leftSideBearing);
             (void)leftSideBearing;
 
             Glyph glyph{};
-            glyph.advance = static_cast<float>(advanceWidth) * m_scale;
+            glyph.advance =
+                static_cast<float>(advanceWidth) * m_scale;
             glyph.xOffset = static_cast<float>(xOffset);
             glyph.yOffset = static_cast<float>(yOffset);
             glyph.width = static_cast<float>(width);
             glyph.height = static_cast<float>(height);
-            glyph.u0 = width > 0 ? static_cast<float>(penX) / static_cast<float>(m_atlasWidth) : 0.0f;
-            glyph.v0 = height > 0 ? static_cast<float>(penY + height) / static_cast<float>(m_atlasHeight) : 0.0f;
-            glyph.u1 = width > 0 ? static_cast<float>(penX + width) / static_cast<float>(m_atlasWidth) : 0.0f;
-            glyph.v1 = height > 0 ? static_cast<float>(penY) / static_cast<float>(m_atlasHeight) : 0.0f;
+            glyph.u0 =
+                width > 0
+                ? static_cast<float>(penX)
+                    / static_cast<float>(m_atlasWidth)
+                : 0.0f;
+            glyph.v0 =
+                height > 0
+                ? static_cast<float>(penY + height)
+                    / static_cast<float>(m_atlasHeight)
+                : 0.0f;
+            glyph.u1 =
+                width > 0
+                ? static_cast<float>(penX + width)
+                    / static_cast<float>(m_atlasWidth)
+                : 0.0f;
+            glyph.v1 =
+                height > 0
+                ? static_cast<float>(penY)
+                    / static_cast<float>(m_atlasHeight)
+                : 0.0f;
             glyph.glyphIndex = glyphIndex;
             m_glyphs.emplace(codepoint, glyph);
 
@@ -642,22 +785,31 @@ namespace WidgeCraft {
             m_fallbackGlyph = &m_glyphs.begin()->second;
         }
 
-        m_edgeValue = static_cast<float>(kOnEdgeValue) / 255.0f;
-        m_softness = 1.0f;
+        m_edgeValue =
+            static_cast<float>(kOnEdgeValue) / 255.0f;
+        m_softness =
+            kPixelDistanceScale / 255.0f;
     }
 
     void TextRenderer::createShader() {
-        const GLuint vertexShader = compileShader(GL_VERTEX_SHADER, kVertexShader);
-        const GLuint fragmentShader = compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
+        const GLuint vertexShader =
+            compileShader(GL_VERTEX_SHADER, kVertexShader);
+        const GLuint fragmentShader =
+            compileShader(GL_FRAGMENT_SHADER, kFragmentShader);
         m_shader = linkProgram(vertexShader, fragmentShader);
         glDeleteShader(vertexShader);
         glDeleteShader(fragmentShader);
 
         glUseProgram(m_shader);
-        glUniform1i(glGetUniformLocation(m_shader, "uTexture"), 0);
-        m_uniformProjection = glGetUniformLocation(m_shader, "uProjection");
-        m_uniformEdgeValue = glGetUniformLocation(m_shader, "uEdgeValue");
-        m_uniformSoftness = glGetUniformLocation(m_shader, "uSoftness");
+        glUniform1i(
+            glGetUniformLocation(m_shader, "uTexture"),
+            0);
+        m_uniformProjection =
+            glGetUniformLocation(m_shader, "uProjection");
+        m_uniformEdgeValue =
+            glGetUniformLocation(m_shader, "uEdgeValue");
+        m_uniformSoftness =
+            glGetUniformLocation(m_shader, "uSoftness");
         glUseProgram(0);
     }
 
@@ -667,14 +819,36 @@ namespace WidgeCraft {
 
         glBindVertexArray(m_vao);
         glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-        glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            0,
+            nullptr,
+            GL_DYNAMIC_DRAW);
 
         glEnableVertexAttribArray(0);
-        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, x)));
+        glVertexAttribPointer(
+            0,
+            2,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(Vertex),
+            reinterpret_cast<void*>(offsetof(Vertex, x)));
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, u)));
+        glVertexAttribPointer(
+            1,
+            2,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(Vertex),
+            reinterpret_cast<void*>(offsetof(Vertex, u)));
         glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(Vertex), reinterpret_cast<void*>(offsetof(Vertex, r)));
+        glVertexAttribPointer(
+            2,
+            4,
+            GL_FLOAT,
+            GL_FALSE,
+            sizeof(Vertex),
+            reinterpret_cast<void*>(offsetof(Vertex, r)));
 
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
@@ -698,11 +872,34 @@ namespace WidgeCraft {
             GL_RED,
             GL_UNSIGNED_BYTE,
             m_atlasData.data());
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_WRAP_S,
+            GL_CLAMP_TO_EDGE);
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_WRAP_T,
+            GL_CLAMP_TO_EDGE);
+
+        // Naively averaging a signed-distance field into mip levels moves
+        // the zero crossing and can erase thin strokes. The shader performs
+        // screen-space antialiasing directly from the base field instead.
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_MIN_FILTER,
+            GL_LINEAR);
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_MAG_FILTER,
+            GL_LINEAR);
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_BASE_LEVEL,
+            0);
+        glTexParameteri(
+            GL_TEXTURE_2D,
+            GL_TEXTURE_MAX_LEVEL,
+            0);
         glBindTexture(GL_TEXTURE_2D, 0);
     }
 
@@ -722,8 +919,11 @@ namespace WidgeCraft {
         m_projection(1, 3) = -1.0f;
     }
 
-    const TextRenderer::Glyph* TextRenderer::findGlyph(char32_t codepoint) const {
-        if (const auto it = m_glyphs.find(codepoint); it != m_glyphs.end()) {
+    const TextRenderer::Glyph* TextRenderer::findGlyph(
+        char32_t codepoint) const {
+
+        if (const auto it = m_glyphs.find(codepoint);
+            it != m_glyphs.end()) {
             return &it->second;
         }
         return m_fallbackGlyph;
