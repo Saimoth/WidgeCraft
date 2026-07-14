@@ -15,7 +15,7 @@ namespace WidgeCraft {
 
     class TextRenderer {
     public:
-        using Color = WidgeCraft::Color;
+        using Color = ::WidgeCraft::Color;
 
         struct TextBounds {
             float minX = 0.0f;

@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(WidgeCraft VERSION 0.4.0 LANGUAGES CXX)
+project(WidgeCraft VERSION 0.6.0 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -26,6 +26,9 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(glfw)
 
 # ---------------- GLAD ----------------
+# Use the specification bundled with the pinned GLAD release. This keeps clean
+# builds deterministic and avoids a second network download during generation.
+set(GLAD_REPRODUCIBLE ON CACHE BOOL "" FORCE)
 FetchContent_Declare(
     glad
     GIT_REPOSITORY https://github.com/Dav1dde/glad.git
@@ -45,10 +48,15 @@ endfunction()
 set(WIDGECRAFT_ENGINE_HEADERS
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/WidgeCraft.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/input/Input.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/physics/Collider.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/physics/PhysicsWorld.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/window/Window.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/ui/Frame.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/ui/Widget.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/ui/UiManager.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/ui/UiScreen.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Scene.hpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/SceneManager.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Camera2D.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/Camera3D.hpp
     ${CMAKE_CURRENT_SOURCE_DIR}/include/WidgeCraft/scene/ModelViewport.hpp
@@ -64,9 +72,13 @@ set(WIDGECRAFT_ENGINE_HEADERS
 set(WIDGECRAFT_ENGINE_SOURCES
     ${CMAKE_CURRENT_SOURCE_DIR}/src/core/WidgeCraft.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/input/Input.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/physics/PhysicsWorld.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/window/Window.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/Frame.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/Widget.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/UiManager.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/ui/UiScreen.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/scene/SceneManager.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/scene/Raycast.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/render/ShaderProgram.cpp
     ${CMAKE_CURRENT_SOURCE_DIR}/src/primitives/Shapes2D.cpp

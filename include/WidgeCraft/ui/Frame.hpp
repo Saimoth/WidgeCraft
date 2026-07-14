@@ -46,6 +46,10 @@ namespace WidgeCraft {
 
         void setVisible(bool visible);
         bool isVisible() const { return m_visible; }
+        bool isVisibleInHierarchy() const {
+            return m_visible
+                && (!m_parent || m_parent->isVisibleInHierarchy());
+        }
 
         void setBackgroundVisible(bool visible) { m_showBackground = visible; }
         bool isBackgroundVisible() const { return m_showBackground; }
@@ -74,6 +78,7 @@ namespace WidgeCraft {
 
         Position getAbsolutePosition() const;
         Rect getAbsoluteRect() const;
+        Rect getVisibleRect() const;
 
         Frame& createChildFrame(const std::string& name);
         Frame* findChildFrame(const std::string& name);
