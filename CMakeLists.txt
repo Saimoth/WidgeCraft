@@ -6,6 +6,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 option(WIDGECRAFT_BUILD_DEMO "Build the interactive WidgeCraft showcase" ON)
+option(WIDGECRAFT_BUILD_SANDBOX "Build the interactive 3D raycast sandbox" ON)
 option(WIDGECRAFT_BUILD_TESTS "Build WidgeCraft unit tests" ON)
 
 include(FetchContent)
@@ -88,6 +89,21 @@ if(WIDGECRAFT_BUILD_DEMO)
             ${CMAKE_CURRENT_SOURCE_DIR}/assets
             $<TARGET_FILE_DIR:widgecraft>/assets
         COMMENT "Copying WidgeCraft assets"
+    )
+endif()
+
+# ---------------- 3D raycast sandbox ----------------
+if(WIDGECRAFT_BUILD_SANDBOX)
+    add_executable(widgecraft_3d_sandbox examples/ThreeDSandbox.cpp)
+    set_target_properties(widgecraft_3d_sandbox PROPERTIES FOLDER "Examples")
+    target_link_libraries(widgecraft_3d_sandbox PRIVATE WidgeCraft::Engine)
+    widgecraft_enable_warnings(widgecraft_3d_sandbox)
+
+    add_custom_command(TARGET widgecraft_3d_sandbox POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            ${CMAKE_CURRENT_SOURCE_DIR}/assets
+            $<TARGET_FILE_DIR:widgecraft_3d_sandbox>/assets
+        COMMENT "Copying WidgeCraft assets for 3D sandbox"
     )
 endif()
 
