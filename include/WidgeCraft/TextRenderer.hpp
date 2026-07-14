@@ -27,7 +27,9 @@ namespace WidgeCraft {
             float height() const { return maxY - minY; }
         };
 
-        TextRenderer(int screenWidth, int screenHeight, const std::string& fontPath, float fontPixelHeight = 64.0f);
+        // The source SDF is generated at 128 px by default. Keeping common UI
+        // sizes below the source resolution preserves sharp concave corners.
+        TextRenderer(int screenWidth, int screenHeight, const std::string& fontPath, float fontPixelHeight = 128.0f);
         ~TextRenderer();
 
         TextRenderer(const TextRenderer&) = delete;
