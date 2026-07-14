@@ -1,14 +1,21 @@
 #pragma once
 
-#include "WidgeCraft/Input.hpp"
-#include "WidgeCraft/Raycast.hpp"
-#include "WidgeCraft/ShapeRenderer.hpp"
-#include "WidgeCraft/TextRenderer.hpp"
-#include "WidgeCraft/Types.hpp"
-#include "WidgeCraft/Window.hpp"
+#include "WidgeCraft/input/Input.hpp"
+#include "WidgeCraft/primitives/Shapes2D.hpp"
+#include "WidgeCraft/primitives/Shapes3D.hpp"
+#include "WidgeCraft/primitives/TextRenderer.hpp"
+#include "WidgeCraft/primitives/Types.hpp"
+#include "WidgeCraft/render/ShaderProgram.hpp"
+#include "WidgeCraft/scene/Raycast.hpp"
+#include "WidgeCraft/scene/Scene.hpp"
+#include "WidgeCraft/ui/Frame.hpp"
+#include "WidgeCraft/ui/Widget.hpp"
+#include "WidgeCraft/window/Window.hpp"
 
 #include <functional>
+#include <memory>
 #include <string>
+#include <utility>
 
 namespace WidgeCraft {
 
@@ -17,8 +24,13 @@ namespace WidgeCraft {
         using UpdateCallback = std::function<void(WidgeCraft&)>;
         using RenderCallback = std::function<void(WidgeCraft&)>;
 
-        WidgeCraft(std::string title, int width, int height, std::string fontPath = {}, float fontPixelHeight = 128.0f);
-        ~WidgeCraft() = default;
+        WidgeCraft(
+            std::string title,
+            int width,
+            int height,
+            std::string fontPath = {},
+            float fontPixelHeight = 128.0f);
+        ~WidgeCraft();
 
         WidgeCraft(const WidgeCraft&) = delete;
         WidgeCraft& operator=(const WidgeCraft&) = delete;
@@ -30,8 +42,16 @@ namespace WidgeCraft {
         void Update();
         void Render();
 
-        void setUpdateCallback(UpdateCallback callback) { m_updateCallback = std::move(callback); }
-        void setRenderCallback(RenderCallback callback) { m_renderCallback = std::move(callback); }
+        void setUpdateCallback(UpdateCallback callback) {
+            m_updateCallback = std::move(callback);
+        }
+        void setRenderCallback(RenderCallback callback) {
+            m_renderCallback = std::move(callback);
+        }
+
+        void setScene(std::unique_ptr<Scene> scene);
+        Scene* getScene() { return m_scene.get(); }
+        const Scene* getScene() const { return m_scene.get(); }
 
         void setClearColor(Color color) { m_clearColor = color; }
         Color getClearColor() const { return m_clearColor; }
@@ -51,8 +71,14 @@ namespace WidgeCraft {
         TextRenderer& getTextRenderer() { return m_textRenderer; }
         const TextRenderer& getTextRenderer() const { return m_textRenderer; }
 
-        ShapeRenderer& getShapeRenderer() { return m_shapeRenderer; }
-        const ShapeRenderer& getShapeRenderer() const { return m_shapeRenderer; }
+        Shapes2D& getShapes2D() { return m_shapes2D; }
+        const Shapes2D& getShapes2D() const { return m_shapes2D; }
+        Shapes3D& getShapes3D() { return m_shapes3D; }
+        const Shapes3D& getShapes3D() const { return m_shapes3D; }
+
+        // Compatibility with the original API while callers move to getShapes2D().
+        ShapeRenderer& getShapeRenderer() { return m_shapes2D; }
+        const ShapeRenderer& getShapeRenderer() const { return m_shapes2D; }
 
     private:
         void initializeGraphics();
@@ -60,10 +86,12 @@ namespace WidgeCraft {
 
         Window m_window;
         TextRenderer m_textRenderer;
-        ShapeRenderer m_shapeRenderer;
+        Shapes2D m_shapes2D;
+        Shapes3D m_shapes3D;
         Color m_clearColor{ 0.055f, 0.070f, 0.095f, 1.0f };
         UpdateCallback m_updateCallback;
         RenderCallback m_renderCallback;
+        std::unique_ptr<Scene> m_scene;
         float m_deltaTime = 0.0f;
         double m_elapsedTime = 0.0;
         int m_targetFrameRate = 60;
