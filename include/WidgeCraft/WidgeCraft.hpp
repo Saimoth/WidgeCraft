@@ -17,7 +17,7 @@ namespace WidgeCraft {
         using UpdateCallback = std::function<void(WidgeCraft&)>;
         using RenderCallback = std::function<void(WidgeCraft&)>;
 
-        WidgeCraft(std::string title, int width, int height, std::string fontPath = {}, float fontPixelHeight = 64.0f);
+        WidgeCraft(std::string title, int width, int height, std::string fontPath = {}, float fontPixelHeight = 128.0f);
         ~WidgeCraft() = default;
 
         WidgeCraft(const WidgeCraft&) = delete;
