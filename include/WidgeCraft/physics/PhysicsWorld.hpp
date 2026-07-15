@@ -2,6 +2,7 @@
 
 #include "WidgeCraft/physics/Collider.hpp"
 #include "WidgeCraft/scene/Raycast.hpp"
+#include "WidgeCraft/terrain/HeightMap.hpp"
 
 #include <cstdint>
 #include <memory>
@@ -48,6 +49,14 @@ namespace WidgeCraft {
         void setEnabled(bool enabled) { m_enabled = enabled; }
         bool isEnabled() const { return m_enabled; }
 
+        void setCollisionEnabled(bool enabled) {
+            m_collisionEnabled = enabled;
+        }
+        bool isCollisionEnabled() const { return m_collisionEnabled; }
+
+        void setTrigger(bool trigger) { m_trigger = trigger; }
+        bool isTrigger() const { return m_trigger; }
+
     private:
         friend class PhysicsWorld;
 
@@ -68,6 +77,8 @@ namespace WidgeCraft {
         float m_gravityScale = 1.0f;
         bool m_grounded = false;
         bool m_enabled = true;
+        bool m_collisionEnabled = true;
+        bool m_trigger = false;
     };
 
     struct PhysicsCollision {
@@ -76,6 +87,7 @@ namespace WidgeCraft {
         // Points from the second body towards the first body.
         Vec3 normal{};
         float penetration = 0.0f;
+        bool trigger = false;
     };
 
     class PhysicsWorld {
@@ -100,6 +112,16 @@ namespace WidgeCraft {
         void setSolverIterations(int iterations);
         int getSolverIterations() const { return m_solverIterations; }
 
+        // Adds a triangle-sampled heightfield beneath dynamic AABB bodies.
+        // Passing nullptr removes terrain collision.
+        void setHeightMapCollider(
+            std::shared_ptr<const HeightMap> heightMap) {
+            m_heightMapCollider = std::move(heightMap);
+        }
+        std::shared_ptr<const HeightMap> getHeightMapCollider() const {
+            return m_heightMapCollider;
+        }
+
         void step(float deltaTime);
 
         const std::vector<std::unique_ptr<PhysicsBody>>& getBodies() const {
@@ -112,9 +134,15 @@ namespace WidgeCraft {
     private:
         void integrate(float deltaTime);
         void solveCollisions();
+        void solveHeightMapCollisions();
         void recordCollision(
             const PhysicsBody& first,
             const PhysicsBody& second,
+            const Vec3& normal,
+            float penetration,
+            bool trigger);
+        void recordHeightMapCollision(
+            const PhysicsBody& body,
             const Vec3& normal,
             float penetration);
         PhysicsBodyId allocateId();
@@ -122,6 +150,7 @@ namespace WidgeCraft {
         Vec3 m_gravity{ 0.0f, -18.0f, 0.0f };
         std::vector<std::unique_ptr<PhysicsBody>> m_bodies;
         std::vector<PhysicsCollision> m_collisions;
+        std::shared_ptr<const HeightMap> m_heightMapCollider;
         PhysicsBodyId m_nextId = 1;
         float m_maximumStep = 1.0f / 120.0f;
         int m_solverIterations = 4;

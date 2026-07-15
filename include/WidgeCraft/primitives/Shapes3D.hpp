@@ -1,5 +1,6 @@
 #pragma once
 
+#include "WidgeCraft/model/Mesh.hpp"
 #include "WidgeCraft/primitives/Types.hpp"
 #include "WidgeCraft/render/ShaderProgram.hpp"
 
@@ -66,12 +67,20 @@ namespace WidgeCraft {
             const Vec3& center,
             float size,
             const ShapeStyle3D& style = ShapeStyle3D{});
+        void drawMesh(
+            const Mesh3D& mesh,
+            const Transform3D& transform = {},
+            const ShapeStyle3D& style = ShapeStyle3D{});
 
         std::size_t getQueuedTriangleCount() const {
             return m_triangles.size() / 3;
         }
         std::size_t getQueuedLineCount() const {
             return m_lines.size();
+        }
+        std::size_t getQueuedVertexBytes() const {
+            return m_triangles.size() * sizeof(Vertex)
+                + m_lines.size() * sizeof(LineCommand);
         }
 
     private:

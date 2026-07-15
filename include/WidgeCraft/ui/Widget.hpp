@@ -194,6 +194,56 @@ namespace WidgeCraft {
         ChangeCallback m_onChanged;
     };
 
+    class Slider : public Widget {
+    public:
+        using ChangeCallback = std::function<void(float)>;
+
+        Slider(
+            std::string name,
+            float minimum = 0.0f,
+            float maximum = 1.0f,
+            float value = 0.0f);
+
+        void setRange(float minimum, float maximum);
+        float getMinimum() const { return m_minimum; }
+        float getMaximum() const { return m_maximum; }
+
+        void setValue(float value);
+        float getValue() const { return m_value; }
+
+        void setStep(float step) { m_step = std::max(step, 0.0f); }
+        float getStep() const { return m_step; }
+
+        void setTrackColor(Color color) { m_trackColor = color; }
+        void setFillColor(Color color) { m_fillColor = color; }
+        void setThumbColor(Color color) { m_thumbColor = color; }
+        void setOnChanged(ChangeCallback callback) {
+            m_onChanged = std::move(callback);
+        }
+
+        bool isDragging() const { return m_dragging; }
+
+        void render(
+            Frame& frame,
+            TextRenderer& textRenderer,
+            ShapeRenderer& shapeRenderer,
+            const Input& input) override;
+
+    private:
+        float quantize(float value) const;
+        void setValueFromPointer(float pointerX, const Rect& track);
+
+        float m_minimum = 0.0f;
+        float m_maximum = 1.0f;
+        float m_value = 0.0f;
+        float m_step = 0.0f;
+        bool m_dragging = false;
+        Color m_trackColor{ 0.13f, 0.18f, 0.24f, 1.0f };
+        Color m_fillColor{ 0.18f, 0.58f, 0.82f, 1.0f };
+        Color m_thumbColor{ 0.78f, 0.92f, 1.0f, 1.0f };
+        ChangeCallback m_onChanged;
+    };
+
     template <typename T, typename... Args>
     T& Widgets::emplace(Args&&... args) {
         auto widget = std::make_unique<T>(std::forward<Args>(args)...);

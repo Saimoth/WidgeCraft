@@ -1,5 +1,6 @@
 #pragma once
 
+#include "WidgeCraft/model/Mesh.hpp"
 #include "WidgeCraft/primitives/Types.hpp"
 
 #include <cstddef>
@@ -107,7 +108,17 @@ namespace WidgeCraft {
             }
         }
 
+        void drawMesh(
+            const Mesh2D& mesh,
+            const Vec2& position = {},
+            float rotationRadians = 0.0f,
+            const Vec2& scale = { 1.0f, 1.0f },
+            const ShapeStyle2D& style = ShapeStyle2D{});
+
         std::size_t getQueuedTriangleCount() const { return m_vertices.size() / 3; }
+        std::size_t getQueuedVertexBytes() const {
+            return m_vertices.size() * sizeof(Vertex);
+        }
 
     private:
         struct Vertex {
