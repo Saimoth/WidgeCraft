@@ -1,23 +1,27 @@
 # WidgeCraft
 
-WidgeCraft is a Windows-focused C++17/OpenGL 3.3 engine foundation with managed scenes and UI screens, lightweight AABB physics, retained UI, SDF text, batched 2D primitives, basic 3D primitives, independently clipped model viewports and ray queries. The supported development target is Visual Studio 2022, Win32, Release.
+WidgeCraft is a Windows-focused C++17/OpenGL 3.3 engine foundation with managed scenes, objects and UI screens, heightmap terrain, lightweight AABB/heightfield physics, OBJ/STL models, retained UI, SDF text, batched 2D and 3D primitives, independently clipped model viewports and ray queries. The supported development target is Visual Studio 2022, Win32, Release.
 
 ## Project layout
 
 ```text
 include/WidgeCraft/
   input/        Keyboard, mouse and pointer state
-  physics/      Box colliders, bodies, gravity and collision resolution
+  model/        Shared meshes, transforms and OBJ/STL loading
+  physics/      Box/heightfield collision, triggers, bodies and gravity
+  terrain/      PGM heightmaps, gradual generation and terrain meshes
   window/       Window, framebuffer and client-area ownership
   ui/           UI screens, scene views, frames and retained widgets
-  scene/        Scene management, cameras, model viewports and raycasting
+  scene/        Scene/object management, cameras, viewports and raycasting
   render/       Shader-program and rendering-pipeline utilities
   primitives/   Maths/types, Shapes2D, Shapes3D and SDF text
 
 src/
   core/         Application loop and subsystem orchestration
   input/        Input implementation
+  model/        Mesh transforms and model parsers
   physics/      Sub-stepped physics simulation and collision solver
+  terrain/      Height sampling, generation and mesh construction
   window/       Window implementation
   ui/           Frame and widget implementation
   scene/        Scene-query implementation
@@ -100,11 +104,66 @@ WidgeCraft::Ray ray = viewport.screenPointToRay3D(
 
 `drawLabel3D` keeps a projected object label at a fixed pixel size. `drawWorldText3D` creates a camera-facing label whose size is derived from a requested world height.
 
+### Draw distance
+
+`ModelViewport::setDrawDistance` updates the 3D camera far plane. `ObjectManager::setDrawDistance` performs the matching CPU distance test, so out-of-range objects are not transformed, queued or labelled before the GPU clips the view.
+
+```cpp
+viewport.setDrawDistance(80.0f);
+objects.setDrawDistance(80.0f);
+
+const auto stats = objects.render(
+    engine.getShapes3D(),
+    viewport.getCamera3D().getPosition(),
+    &viewport,
+    &engine.getTextRenderer());
+```
+
+`ObjectRenderStats` reports considered, rendered and culled objects, queued triangles and labels, temporary vertex bytes, and CPU queue time.
+
 ## Primitive drawing
 
 `Shapes2D` supports points, thick lines, triangles, rectangles and circles. `ShapeStyle2D` combines fill colour, edge colour and edge thickness.
 
-`Shapes3D` supports lines, triangles, quads, boxes and cubes. `ShapeStyle3D` provides fill and edge styling. The 3D edge thickness uses OpenGL line width and is subject to the graphics driver's supported range.
+`Shapes3D` supports lines, triangles, quads, boxes, cubes and shared `Mesh3D` objects. All filled triangles queued in one viewport pass share one GPU upload/draw. `Shapes2D::drawMesh` does the same for `Mesh2D`. `ShapeStyle3D` provides fill and edge styling. The 3D edge thickness uses OpenGL line width and is subject to the graphics driver's supported range.
+
+## Models and managed objects
+
+`ModelLoader` reads Wavefront OBJ faces (including polygon fan triangulation and negative indices), ASCII STL and binary STL. A loaded 3D mesh can also be projected onto the XY, XZ or YZ plane for batched 2D drawing.
+
+```cpp
+auto mesh = std::make_shared<WidgeCraft::Mesh3D>(
+    WidgeCraft::ModelLoader::load("assets/models/pyramid.obj"));
+
+WidgeCraft::ObjectManager objects(&physics);
+auto& object = objects.createMeshObject("Pyramid", mesh);
+object.setPosition({ 4.0f, 1.0f, -3.0f });
+object.getAttributes().collidable = true;
+object.getAttributes().fixed = true;
+object.getAttributes().labelVisible = true;
+```
+
+Every managed object has `enabled`, `rendered`, `interactable`, `collidable`, `fixed`, `gravity`, `trigger`, `selectable` and `labelVisible` attributes. `preparePhysics()` creates or updates the required bodies before `PhysicsWorld::step`; `syncFromPhysics()` copies dynamic body positions back afterwards. Trigger bodies report overlap in `PhysicsCollision::trigger` without applying collision response.
+
+`raycastInteractable` only considers enabled, interactable/selectable objects. `queryTriggers` provides a physics-independent AABB trigger query, while `getTriggeredObjects` maps current physics trigger overlaps back to object IDs.
+
+## Heightmap terrain
+
+`HeightMap` can load 8-bit P2/P5 PGM files or create reproducible gradual random terrain. The `maximumNeighbourStep` generator argument limits adjacent vertex height changes before optional smoothing.
+
+```cpp
+auto heights = std::make_shared<WidgeCraft::HeightMap>(
+    WidgeCraft::HeightMap::generateGradual(
+        65, 65, 1.0f, 0.58f, 1337, 3,
+        { -32.0f, 0.0f, -32.0f }));
+
+WidgeCraft::Terrain terrain(heights);
+physics.setHeightMapCollider(heights);
+```
+
+The rectangular grid is split into alternating right triangles. A heightmap naturally supplies square rows and columns; alternating the diagonal avoids a consistent directional bias while preserving compact indexing and exact collision sampling. An equilateral layout would require staggered samples and would not map cleanly to ordinary heightmap images.
+
+Dynamic AABB bodies sample the same triangle surface used to render `Terrain`, so gravity, grounded state and jumping work on gradual slopes. `Terrain::draw` also accepts a CPU draw distance for large grids.
 
 ## Physics
 
@@ -127,7 +186,7 @@ auto& player = physics.createBody(
 physics.step(engine.getDeltaTime());
 ```
 
-`PhysicsBody::getBounds()` returns the same world-space `AABB` accepted by `raycast`, so picking and collision can share one authoritative bound. This first physics layer intentionally uses axis-aligned boxes and has no rotational dynamics or mesh colliders yet.
+`PhysicsBody::getBounds()` returns the same world-space `AABB` accepted by `raycast`, so picking and collision can share one authoritative bound. Box bodies remain axis-aligned and do not have rotational dynamics; terrain collision is sampled from the heightmap rather than using a general triangle-mesh solver.
 
 ## Scene and UI
 
@@ -179,7 +238,7 @@ minimap.setRenderCallback([](
 });
 ```
 
-Inactive UI screens do not render or process widget input. The retained UI contains `Frame`, `Label`, `Button` and `Checkbox`, and remains isolated from scene transforms and clipping.
+Inactive UI screens do not render or process widget input. The retained UI contains `Frame`, `Label`, `Button`, `Checkbox` and `Slider`, and remains isolated from scene transforms and clipping.
 
 ## Interactive sandbox controls
 
@@ -212,6 +271,14 @@ build\win32-release\WidgeCraft.sln
 ```
 
 The generated solution sets `widgecraft_ui_sandbox` as the startup project.
+
+Three launchable sandbox projects are available under the solution's `Sandbox` folder:
+
+- `widgecraft_ui_sandbox`: scene/UI switching, camera follow, enemy selection, collision and minimap.
+- `widgecraft_terrain_sandbox`: gradual seeded terrain, WASD movement, heightfield gravity and `Space` jumping.
+- `widgecraft_batch_sandbox`: 1,000 OBJ/STL objects with SDF ID labels, queue/memory statistics and a draw-distance slider. Use WASD and right-drag to move the camera.
+
+To run one in Visual Studio, right-click the sandbox project, choose **Set as Startup Project**, then press `F5` (debug) or `Ctrl+F5` (without the debugger).
 
 ## Build
 

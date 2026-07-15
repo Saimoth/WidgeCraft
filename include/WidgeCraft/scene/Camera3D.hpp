@@ -59,6 +59,12 @@ namespace WidgeCraft {
 
         float getNearPlane() const { return m_nearPlane; }
         float getFarPlane() const { return m_farPlane; }
+        void setNearPlane(float nearPlane) {
+            setDepthRange(nearPlane, m_farPlane);
+        }
+        void setFarPlane(float farPlane) {
+            setDepthRange(m_nearPlane, farPlane);
+        }
         float getVerticalFieldOfViewDegrees() const {
             return m_verticalFieldOfViewDegrees;
         }

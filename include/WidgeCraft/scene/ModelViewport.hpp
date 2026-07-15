@@ -50,6 +50,15 @@ namespace WidgeCraft {
         Camera3D& getCamera3D() { return m_camera3D; }
         const Camera3D& getCamera3D() const { return m_camera3D; }
 
+        // Draw distance is the camera far plane. Pair it with ObjectManager's
+        // CPU culling distance to avoid queuing objects that the GPU will clip.
+        void setDrawDistance(float distance) {
+            m_camera3D.setFarPlane(distance);
+        }
+        float getDrawDistance() const {
+            return m_camera3D.getFarPlane();
+        }
+
         Vec2 worldToScreen2D(const Vec2& worldPosition) const {
             return m_camera2D.worldToScreen(worldPosition, m_screenRect);
         }

@@ -4,6 +4,7 @@
 #include "WidgeCraft/ShapeRenderer.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace WidgeCraft {
@@ -301,6 +302,130 @@ namespace WidgeCraft {
             }
             textRenderer.renderText(m_text, textX, textY, textSize, textColor);
         }
+    }
+
+    Slider::Slider(
+        std::string name,
+        float minimum,
+        float maximum,
+        float value)
+        : Widget(std::move(name)) {
+        setRange(minimum, maximum);
+        setValue(value);
+    }
+
+    void Slider::setRange(float minimum, float maximum) {
+        m_minimum = std::min(minimum, maximum);
+        m_maximum = std::max(minimum, maximum);
+        if (m_maximum - m_minimum < 0.0001f) {
+            m_maximum = m_minimum + 0.0001f;
+        }
+        m_value = quantize(m_value);
+    }
+
+    void Slider::setValue(float value) {
+        m_value = quantize(value);
+    }
+
+    float Slider::quantize(float value) const {
+        float result = std::clamp(value, m_minimum, m_maximum);
+        if (m_step > 0.0f) {
+            const float safeStep = std::max(m_step, 0.000001f);
+            result = m_minimum
+                + std::round((result - m_minimum) / safeStep) * safeStep;
+            result = std::clamp(result, m_minimum, m_maximum);
+        }
+        return result;
+    }
+
+    void Slider::setValueFromPointer(
+        float pointerX,
+        const Rect& track) {
+
+        const float ratio = track.width > 0.0f
+            ? std::clamp((pointerX - track.x) / track.width, 0.0f, 1.0f)
+            : 0.0f;
+        const float next = quantize(
+            m_minimum + ratio * (m_maximum - m_minimum));
+        if (std::abs(next - m_value) <= 0.0001f) {
+            return;
+        }
+        m_value = next;
+        if (m_onChanged) {
+            m_onChanged(m_value);
+        }
+    }
+
+    void Slider::render(
+        Frame& frame,
+        TextRenderer& textRenderer,
+        ShapeRenderer& shapeRenderer,
+        const Input& input) {
+
+        (void)textRenderer;
+        const Rect rect = resolveRect(frame, { 240.0f, 30.0f });
+        setComputedSize(rect.width, rect.height);
+
+        const float thumbRadius = std::min(10.0f, rect.height * 0.36f);
+        const Rect track{
+            rect.x + thumbRadius,
+            rect.y + rect.height * 0.5f - 3.0f,
+            std::max(0.0f, rect.width - thumbRadius * 2.0f),
+            6.0f
+        };
+        const bool hovered = isEnabled() && rect.contains(input.mousePosition());
+        if (!isEnabled()) {
+            m_dragging = false;
+        } else {
+            if (input.mousePressed(MouseButton::Left) && hovered) {
+                m_dragging = true;
+                setValueFromPointer(input.mousePosition().x, track);
+            }
+            if (m_dragging && input.mouseDown(MouseButton::Left)) {
+                setValueFromPointer(input.mousePosition().x, track);
+            }
+            if (input.mouseReleased(MouseButton::Left)) {
+                m_dragging = false;
+            }
+        }
+
+        const float ratio = (m_value - m_minimum)
+            / (m_maximum - m_minimum);
+        const float thumbX = track.x + ratio * track.width;
+        Color trackColor = m_trackColor;
+        Color fillColor = m_fillColor;
+        Color thumbColor = m_thumbColor;
+        if (!isEnabled()) {
+            trackColor.a *= 0.45f;
+            fillColor.a *= 0.45f;
+            thumbColor.a *= 0.45f;
+        }
+
+        shapeRenderer.drawFilledRect(
+            track.x,
+            track.y,
+            track.width,
+            track.height,
+            trackColor);
+        shapeRenderer.drawFilledRect(
+            track.x,
+            track.y,
+            std::max(0.0f, thumbX - track.x),
+            track.height,
+            fillColor);
+        shapeRenderer.drawFilledCircle(
+            thumbX,
+            rect.y + rect.height * 0.5f,
+            thumbRadius,
+            hovered || m_dragging
+                ? Color{
+                    std::min(thumbColor.r + 0.12f, 1.0f),
+                    std::min(thumbColor.g + 0.08f, 1.0f),
+                    thumbColor.b,
+                    thumbColor.a
+                }
+                : thumbColor,
+            24);
     }
 
 } // namespace WidgeCraft

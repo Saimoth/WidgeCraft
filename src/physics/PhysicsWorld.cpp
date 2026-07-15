@@ -169,6 +169,7 @@ namespace WidgeCraft {
     void PhysicsWorld::clear() {
         m_bodies.clear();
         m_collisions.clear();
+        m_heightMapCollider.reset();
         m_nextId = 1;
     }
 
@@ -224,7 +225,9 @@ namespace WidgeCraft {
              firstIndex < m_bodies.size();
              ++firstIndex) {
             PhysicsBody* first = m_bodies[firstIndex].get();
-            if (!first || !first->isEnabled()) {
+            if (!first
+                || !first->isEnabled()
+                || !first->isCollisionEnabled()) {
                 continue;
             }
 
@@ -232,7 +235,9 @@ namespace WidgeCraft {
                  secondIndex < m_bodies.size();
                  ++secondIndex) {
                 PhysicsBody* second = m_bodies[secondIndex].get();
-                if (!second || !second->isEnabled()) {
+                if (!second
+                    || !second->isEnabled()
+                    || !second->isCollisionEnabled()) {
                     continue;
                 }
 
@@ -240,7 +245,9 @@ namespace WidgeCraft {
                 const float secondInverseMass = second->inverseMass();
                 const float inverseMassSum =
                     firstInverseMass + secondInverseMass;
-                if (inverseMassSum <= 0.0f) {
+                if (inverseMassSum <= 0.0f
+                    && !first->isTrigger()
+                    && !second->isTrigger()) {
                     continue;
                 }
 
@@ -251,6 +258,18 @@ namespace WidgeCraft {
                         *second,
                         normal,
                         penetration)) {
+                    continue;
+                }
+
+                const bool trigger = first->isTrigger()
+                    || second->isTrigger();
+                if (trigger) {
+                    recordCollision(
+                        *first,
+                        *second,
+                        normal,
+                        penetration,
+                        true);
                     continue;
                 }
 
@@ -283,8 +302,72 @@ namespace WidgeCraft {
                     *first,
                     *second,
                     normal,
-                    penetration);
+                    penetration,
+                    false);
             }
+        }
+        solveHeightMapCollisions();
+    }
+
+    void PhysicsWorld::solveHeightMapCollisions() {
+        if (!m_heightMapCollider || m_heightMapCollider->empty()) {
+            return;
+        }
+
+        for (auto& bodyPointer : m_bodies) {
+            PhysicsBody* body = bodyPointer.get();
+            if (!body
+                || !body->isEnabled()
+                || !body->isDynamic()
+                || !body->isCollisionEnabled()
+                || body->isTrigger()) {
+                continue;
+            }
+
+            const AABB bounds = body->getBounds();
+            const float centerX = (bounds.minimum.x + bounds.maximum.x)
+                * 0.5f;
+            const float centerZ = (bounds.minimum.z + bounds.maximum.z)
+                * 0.5f;
+            const float inset = 0.01f;
+            const Vec2 samples[] = {
+                { centerX, centerZ },
+                { bounds.minimum.x + inset, bounds.minimum.z + inset },
+                { bounds.maximum.x - inset, bounds.minimum.z + inset },
+                { bounds.minimum.x + inset, bounds.maximum.z - inset },
+                { bounds.maximum.x - inset, bounds.maximum.z - inset }
+            };
+
+            bool foundGround = false;
+            float groundHeight = -std::numeric_limits<float>::max();
+            Vec2 groundPoint{ centerX, centerZ };
+            for (const Vec2& sample : samples) {
+                const auto height = m_heightMapCollider->sampleHeight(
+                    sample.x,
+                    sample.y);
+                if (height && *height > groundHeight) {
+                    foundGround = true;
+                    groundHeight = *height;
+                    groundPoint = sample;
+                }
+            }
+
+            if (!foundGround || bounds.minimum.y >= groundHeight) {
+                continue;
+            }
+
+            const float penetration = groundHeight - bounds.minimum.y;
+            body->m_position.y += penetration;
+            if (body->m_velocity.y < 0.0f) {
+                body->m_velocity.y = 0.0f;
+            }
+            body->m_grounded = true;
+
+            const Vec3 normal = m_heightMapCollider->sampleNormal(
+                groundPoint.x,
+                groundPoint.y)
+                .value_or(Vec3{ 0.0f, 1.0f, 0.0f });
+            recordHeightMapCollision(*body, normal, penetration);
         }
     }
 
@@ -292,14 +375,16 @@ namespace WidgeCraft {
         const PhysicsBody& first,
         const PhysicsBody& second,
         const Vec3& normal,
-        float penetration) {
+        float penetration,
+        bool trigger) {
 
         const auto iterator = std::find_if(
             m_collisions.begin(),
             m_collisions.end(),
             [&](const PhysicsCollision& collision) {
                 return collision.firstBody == first.getId()
-                    && collision.secondBody == second.getId();
+                    && collision.secondBody == second.getId()
+                    && collision.trigger == trigger;
             });
         if (iterator != m_collisions.end()) {
             if (penetration > iterator->penetration) {
@@ -312,7 +397,36 @@ namespace WidgeCraft {
             first.getId(),
             second.getId(),
             normal,
-            penetration
+            penetration,
+            trigger
+        });
+    }
+
+    void PhysicsWorld::recordHeightMapCollision(
+        const PhysicsBody& body,
+        const Vec3& normal,
+        float penetration) {
+
+        const auto iterator = std::find_if(
+            m_collisions.begin(),
+            m_collisions.end(),
+            [&](const PhysicsCollision& collision) {
+                return collision.firstBody == body.getId()
+                    && collision.secondBody == 0;
+            });
+        if (iterator != m_collisions.end()) {
+            if (penetration > iterator->penetration) {
+                iterator->normal = normal;
+                iterator->penetration = penetration;
+            }
+            return;
+        }
+        m_collisions.push_back({
+            body.getId(),
+            0,
+            normal,
+            penetration,
+            false
         });
     }
 

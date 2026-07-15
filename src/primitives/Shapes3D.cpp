@@ -275,6 +275,28 @@ namespace WidgeCraft {
         drawBox(center - half, center + half, style);
     }
 
+    void Shapes3D::drawMesh(
+        const Mesh3D& mesh,
+        const Transform3D& transform,
+        const ShapeStyle3D& style) {
+
+        if (!mesh.isValid()) {
+            return;
+        }
+
+        for (std::size_t index = 0;
+             index + 2U < mesh.indices.size();
+             index += 3U) {
+            const Vec3 a = transform.transformPoint(
+                mesh.vertices[mesh.indices[index]]);
+            const Vec3 b = transform.transformPoint(
+                mesh.vertices[mesh.indices[index + 1U]]);
+            const Vec3 c = transform.transformPoint(
+                mesh.vertices[mesh.indices[index + 2U]]);
+            drawTriangle(a, b, c, style);
+        }
+    }
+
     Shapes3D::Vertex Shapes3D::makeVertex(
         const Vec3& position,
         const Color& color) {

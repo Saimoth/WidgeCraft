@@ -1,6 +1,8 @@
 #pragma once
 
 #include "WidgeCraft/input/Input.hpp"
+#include "WidgeCraft/model/Mesh.hpp"
+#include "WidgeCraft/model/ModelLoader.hpp"
 #include "WidgeCraft/physics/Collider.hpp"
 #include "WidgeCraft/physics/PhysicsWorld.hpp"
 #include "WidgeCraft/primitives/Shapes2D.hpp"
@@ -11,10 +13,13 @@
 #include "WidgeCraft/scene/Camera2D.hpp"
 #include "WidgeCraft/scene/Camera3D.hpp"
 #include "WidgeCraft/scene/ModelViewport.hpp"
+#include "WidgeCraft/scene/ObjectManager.hpp"
 #include "WidgeCraft/scene/Raycast.hpp"
 #include "WidgeCraft/scene/Scene.hpp"
 #include "WidgeCraft/scene/SceneManager.hpp"
 #include "WidgeCraft/scene/SceneViewport2D.hpp"
+#include "WidgeCraft/terrain/HeightMap.hpp"
+#include "WidgeCraft/terrain/Terrain.hpp"
 #include "WidgeCraft/ui/Frame.hpp"
 #include "WidgeCraft/ui/UiManager.hpp"
 #include "WidgeCraft/ui/UiScreen.hpp"

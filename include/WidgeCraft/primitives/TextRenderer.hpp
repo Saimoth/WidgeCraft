@@ -53,6 +53,9 @@ namespace WidgeCraft {
         float getDescent() const { return m_descent; }
         float getBasePixelHeight() const { return m_basePixelHeight; }
         std::size_t getQueuedGlyphCount() const { return m_vertices.size() / 6; }
+        std::size_t getQueuedVertexBytes() const {
+            return m_vertices.size() * sizeof(float) * 8U;
+        }
 
     private:
         struct Glyph {

@@ -220,6 +220,38 @@ namespace WidgeCraft {
         addVertex(c, color);
     }
 
+    void ShapeRenderer::drawMesh(
+        const Mesh2D& mesh,
+        const Vec2& position,
+        float rotationRadians,
+        const Vec2& scale,
+        const ShapeStyle2D& style) {
+
+        if (!mesh.isValid()) {
+            return;
+        }
+
+        const float cosine = std::cos(rotationRadians);
+        const float sine = std::sin(rotationRadians);
+        const auto transformPoint = [&](const Vec2& point) {
+            const Vec2 scaled{ point.x * scale.x, point.y * scale.y };
+            return Vec2{
+                scaled.x * cosine - scaled.y * sine + position.x,
+                scaled.x * sine + scaled.y * cosine + position.y
+            };
+        };
+
+        for (std::size_t index = 0;
+             index + 2U < mesh.indices.size();
+             index += 3U) {
+            drawTriangle(
+                transformPoint(mesh.vertices[mesh.indices[index]]),
+                transformPoint(mesh.vertices[mesh.indices[index + 1U]]),
+                transformPoint(mesh.vertices[mesh.indices[index + 2U]]),
+                style);
+        }
+    }
+
     void ShapeRenderer::drawFilledRect(float x, float y, float width, float height, const Color& color) {
         if (width <= 0.0f || height <= 0.0f) {
             return;
